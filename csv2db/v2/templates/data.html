@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Данные из базы</title>
+    <style>
+        /* Стили для кнопок и формы */
+        .button {
+            padding: 10px 15px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #4CAF50; /* Зелёный цвет */
+            color: white;
+            text-decoration: none;
+        }
+        .button:hover {
+            background-color: #45a049; /* Темнее при наведении */
+        }
+        .form-inline {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .form-inline input, .form-inline select {
+            margin-right: 10px;
+            padding: 5px;
+        }
+        .table-container {
+            max-height: 400px; /* Задайте желаемую высоту */
+            overflow-y: auto; /* Вертикальная прокрутка */
+            border: 1px solid #ccc; /* Граница контейнера */
+            margin-bottom: 20px; /* Отступ снизу */
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse; /* Убирает двойные границы */
+        }
+        th, td {
+            border: 1px solid #ccc; /* Граница ячеек */
+            padding: 8px; /* Отступы в ячейках */
+            text-align: left; /* Выравнивание текста */
+        }
+        th {
+            background-color: #f2f2f2; /* Цвет фона для заголовков */
+        }
+    </style>
+</head>
+<body>
+    <h1>Данные измерений</h1>
+
+    <form method="get" action="/data" class="form-inline">
+        <label for="sensor">Фильтр по sensor_id:</label>
+        <select name="sensor_id" id="sensor">
+            <option value="">-- Все сенсоры --</option>
+            {% for sensor in sensors %}
+                <option value="{{ sensor.sensor_id }}" {% if sensor.sensor_id|string == selected_sensor_id %}selected{% endif %}>
+                    {{ sensor.sensor_id }} - {{ sensor.sensor_name }}
+                </option>
+            {% endfor %}
+        </select>
+
+        <label for="start_date">Начальная дата:</label>
+        <input type="date" name="start_date" id="start_date" value="{{ start_date }}">
+
+        <label for="end_date">Конечная дата:</label>
+        <input type="date" name="end_date" id="end_date" value="{{ end_date }}">
+
+        <input type="submit" value="Применить фильтры" class="button">
+    </form>
+
+    <h2>Измерения</h2>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Sensor ID</th>
+                    <th>Time</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in measurements %}
+                    <tr>
+                        <td>{{ row.measurement_id }}</td>
+                        <td>{{ row.sensor_id }}</td>
+                        <td>{{ row.measurement_time }}</td>
+                        <td>{{ row.value }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <br><a href="/">← Назад</a>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Загрузка данных</title>
+    <style>
+        .button {
+            padding: 10px 15px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #4CAF50; /* Зелёный цвет */
+            color: white;
+            text-decoration: none;
+        }
+        .button:hover {
+            background-color: #45a049; /* Темнее при наведении */
+        }
+    </style>
+</head>
+<body>
+    <h1>Загрузка данных в базу данных</h1>
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <label for="dataFile">Выберите CSV-файлы с данными:</label>
+        <input type="file" name="dataFile" id="dataFile" accept=".csv" multiple>
+        <br><br>
+        <input type="submit" value="Загрузить в БД" class="button">
+    </form>
+    <br>
+    <a href="/sensors" class="button">📊 Посмотреть сенсоры</a>
+    <a href="/data" class="button">📈 Посмотреть измерения</a>
+</body>
+</html>
