@@ -1,8 +1,8 @@
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, redirect, url_for
 from sqlalchemy.orm import scoped_session
 from db_session import SessionLocal
 from init_db import Sensor, Measurement, Base
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 
 app = Flask(__name__)
@@ -96,28 +96,51 @@ def show_sensors():
 
 @app.route('/data', methods=['GET', 'POST'])
 def show_data():
-    db = SessionLocal()
-    sensors = db.query(Sensor).all()
+    def parse_date(date_str):
+        try:
+            return datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+        except (ValueError, TypeError):
+            return None
 
     selected_sensor_id = request.args.get('sensor_id')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
 
-    query = db.query(Measurement)
-    if selected_sensor_id:
-        query = query.filter(Measurement.sensor_id == int(selected_sensor_id))
-    if start_date:
-        query = query.filter(Measurement.measurement_time >= start_date)
-    if end_date:
-        query = query.filter(Measurement.measurement_time <= end_date)
+    # ЕСЛИ нет ни одного фильтра (первый заход) → редирект с дефолтным фильтром
+    if not start_date and not end_date and not selected_sensor_id:
+        default_start = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        return redirect(url_for('show_data', start_date=default_start))
 
-    measurements = query.order_by(Measurement.measurement_time.desc()).all()
+    with SessionLocal() as db:
+        sensors = db.query(Sensor).all()
 
-   
-    chart_labels = [m.measurement_time.strftime('%Y-%m-%d %H:%M:%S') for m in measurements]
-    chart_values = [m.value for m in measurements]
+        query = db.query(Measurement)
+        if selected_sensor_id and selected_sensor_id.isdigit():
+            query = query.filter(Measurement.sensor_id == int(selected_sensor_id))
 
-    db.close()
+        if start_date:
+            try:
+                # Приводим к datetime если это дата без времени
+                if len(start_date) == 10:
+                    start_date += ' 00:00:00'
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
+                query = query.filter(Measurement.measurement_time >= start_dt)
+            except Exception as e:
+                print(f"Ошибка парсинга start_date: {e}")
+
+        if end_date:
+            try:
+                if len(end_date) == 10:
+                    end_date += ' 23:59:59'
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S')
+                query = query.filter(Measurement.measurement_time <= end_dt)
+            except Exception as e:
+                print(f"Ошибка парсинга end_date: {e}")
+
+        measurements = query.order_by(Measurement.measurement_time.desc()).all()
+
+        chart_labels = [m.measurement_time.strftime('%Y-%m-%d %H:%M:%S') for m in measurements]
+        chart_values = [m.value for m in measurements]
 
     return render_template(
         'data.html',
@@ -126,7 +149,7 @@ def show_data():
         selected_sensor_id=selected_sensor_id,
         start_date=start_date,
         end_date=end_date,
-         chart_labels=chart_labels,
+        chart_labels=chart_labels,
         chart_values=chart_values
     )
 
