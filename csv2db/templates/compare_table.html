@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Сравнение в таблице</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .button {
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            margin-right: 10px;
+        }
+        .button:hover { background-color: #45a049; }
+    </style>
+</head>
+
+<body>
+    <h1>Сравнение прогнозных и фактических данных (таблица)</h1>
+    <h2>{{ actual_name }} vs {{ forecast_name }}</h2>
+
+    {% if comparison_rows %}
+    <table>
+        <thead>
+            <tr>
+                <th>Час</th>
+                <th>Факт (Вт·ч/м²)</th>
+                <th>Прогноз</th>
+                <th>Ошибка</th>
+                <th>Ошибка (%)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in comparison_rows %}
+            <tr>
+                <td>{{ row.time }}</td>
+                <td>{{ row.actual }}</td>
+                <td>{{ row.forecast }}</td>
+                <td>{{ row.error }}</td>
+                <td>{{ row.percent }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p>Нет данных для отображения.</p>
+    {% endif %}
+
+    <br>
+    <form method="get" action="/compare">
+        <input type="hidden" name="sensor_actual_id" value="{{ request.args.get('sensor_actual_id') }}">
+        <input type="hidden" name="sensor_forecast_id" value="{{ request.args.get('sensor_forecast_id') }}">
+        <input type="hidden" name="start_date" value="{{ request.args.get('start_date') }}">
+        <input type="hidden" name="end_date" value="{{ request.args.get('end_date') }}">
+        <input type="submit" value="Перейти к графику" class="button">
+    </form>
+
+    <a href="/" class="button">← На главную</a>
+    <a href="/compare_select" class="button">🔙 К выбору сенсоров</a>
+</body>
+</html>

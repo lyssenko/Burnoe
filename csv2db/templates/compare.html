@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Сравнение прогнозных и фактических данных</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .button {
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            margin-right: 10px;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+        canvas {
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>График сравнения</h1>
+    <h2>Сравнение: {{ actual_name }} vs {{ forecast_name }}</h2>
+
+    {% if chart_labels %}
+    <canvas id="comparisonChart" width="1000" height="400"></canvas>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const labels = {{ chart_labels | tojson }};
+        const actualData = {{ actual_values | tojson }};
+        const forecastData = {{ forecast_values | default([]) | tojson }};
+        const ctx = document.getElementById('comparisonChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Фактические данные',
+                        data: actualData,
+                        borderColor: 'blue',
+                        fill: false,
+                        tension: 0.2,
+                        pointRadius: 1
+                    },
+                    {
+                        label: 'Прогноз',
+                        data: forecastData,
+                        borderColor: 'orange',
+                        fill: false,
+                        tension: 0.2,
+                        pointRadius: 1,
+                        spanGaps: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Время'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Радиация (W/m²)'
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+    {% else %}
+    <p>Нет данных для отображения.</p>
+    {% endif %}
+
+    <br>
+    <form method="get" action="/compare_table">
+        <input type="hidden" name="sensor_actual_id" value="{{ request.args.get('sensor_actual_id') }}">
+        <input type="hidden" name="sensor_forecast_id" value="{{ request.args.get('sensor_forecast_id') }}">
+        <input type="hidden" name="start_date" value="{{ request.args.get('start_date') }}">
+        <input type="hidden" name="end_date" value="{{ request.args.get('end_date') }}">
+        <input type="submit" value="Перейти к табличному сравнению" class="button">
+    </form>
+
+    <a href="/compare_select" class="button">← Назад к выбору</a>
+</body>
+
+</html>

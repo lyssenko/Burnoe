@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Загрузка данных</title>
+    <style>
+        .button {
+            padding: 10px 15px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+        }
+
+        .button:hover {
+            background-color: #45a049;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Загрузка данных в базу данных</h1>
+
+    <div class="section">
+        <h2>Измеренные данные</h2>
+        <form action="/upload" method="post" enctype="multipart/form-data">
+            <label for="dataFile">Выберите CSV-файлы с измерениями:</label>
+            <input type="file" name="dataFile" id="dataFile" accept=".csv" multiple>
+            <br><br>
+            <input type="submit" value="Загрузить измерения" class="button">
+        </form>
+    </div>
+
+    <div class="section">
+        <h2>Прогнозные данные</h2>
+        <form action="/upload_forecast" method="post" enctype="multipart/form-data">
+            <label for="forecastFile">Выберите CSV-файл с прогнозом радиации:</label>
+            <input type="file" name="forecastFile" id="forecastFile" accept=".csv">
+            <br><br>
+            <input type="submit" value="Загрузить прогноз" class="button">
+        </form>
+    </div>
+
+    <a href="/sensors" class="button">📊 Посмотреть сенсоры</a>
+    <a href="/data" class="button">📈 Посмотреть измерения</a>
+    <a href="/compare_select" class="button">🔄 Сравнение факт-прогноз</a>
+</body>
+
+</html>
