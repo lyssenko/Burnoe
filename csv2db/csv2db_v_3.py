@@ -105,116 +105,109 @@ def upload_forecast():
     if not file or not file.filename:
         return "Файл прогноза не выбран", 400
 
-    db = scoped_session(SessionLocal)
-
+    from init_db import Sensor, Measurement
     sensor_name = "B1_forecast"
     sensor_type = "radiation"
     unit = "W/m2"
 
-    sensor = db.query(Sensor).filter_by(sensor_name=sensor_name).first()
-    if sensor:
-        sensor_id = sensor.sensor_id
-    else:
-        sensor = Sensor(sensor_name=sensor_name, sensor_type=sensor_type, unit=unit)
-        db.add(sensor)
-        db.flush()
-        sensor_id = sensor.sensor_id
-
     try:
-        df = pd.read_csv(file)
-        df = df.rename(columns={"Time": "time", "rad": "radiation"})
-        if 'time' not in df.columns or 'radiation' not in df.columns:
-            return "Ошибка: файл должен содержать столбцы 'time' и 'radiation'", 400
-    except Exception as e:
-        db.close()
-        return f"Ошибка чтения файла прогноза: {e}", 400
-
-    try:
-        base_name = file.filename.split('/')[-1]
-        date_str = base_name.replace("irrad_", "").replace(".csv", "")
-        forecast_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-    except Exception:
-        forecast_date = datetime.today().date()
-
-    inserted = 0
-    updated = 0
-
-    for _, row in df.iterrows():
-        try:
-            time_obj = datetime.strptime(row['time'], "%H:%M:%S").time()
-            dt = datetime.combine(forecast_date, time_obj)
-            value = float(row['radiation'])
-
-            existing = db.query(Measurement).filter_by(sensor_id=sensor_id, measurement_time=dt).first()
-            if existing:
-                existing.value = value
-                updated += 1
+        with SessionLocal() as db:
+            sensor = db.query(Sensor).filter_by(sensor_name=sensor_name).first()
+            if sensor:
+                sensor_id = sensor.sensor_id
             else:
-                m = Measurement(sensor_id=sensor_id, measurement_time=dt, value=value)
-                db.add(m)
-                inserted += 1
-        except Exception as e:
-            print(f"Ошибка прогноза в строке: {e}")
+                sensor = Sensor(sensor_name=sensor_name, sensor_type=sensor_type, unit=unit)
+                db.add(sensor)
+                db.flush()
+                sensor_id = sensor.sensor_id
 
-    try:
-        db.commit()
+            try:
+                df = pd.read_csv(file)
+                df = df.rename(columns={"Time": "time", "rad": "radiation"})
+                if 'time' not in df.columns or 'radiation' not in df.columns:
+                    return "Ошибка: файл должен содержать столбцы 'time' и 'radiation'", 400
+            except Exception as e:
+                return f"Ошибка чтения файла прогноза: {e}", 400
+
+            try:
+                base_name = file.filename.split('/')[-1]
+                date_str = base_name.replace("irrad_", "").replace(".csv", "")
+                forecast_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except Exception:
+                forecast_date = datetime.today().date()
+
+            inserted = 0
+            updated = 0
+            for _, row in df.iterrows():
+                try:
+                    time_obj = datetime.strptime(row['time'], "%H:%M:%S").time()
+                    dt = datetime.combine(forecast_date, time_obj)
+                    value = float(row['radiation'])
+
+                    existing = db.query(Measurement).filter_by(sensor_id=sensor_id, measurement_time=dt).first()
+                    if existing:
+                        existing.value = value
+                        updated += 1
+                    else:
+                        m = Measurement(sensor_id=sensor_id, measurement_time=dt, value=value)
+                        db.add(m)
+                        inserted += 1
+                except Exception as e:
+                    print(f"Ошибка прогноза в строке: {e}")
+
+            db.commit()
+            return f"Загружено: {inserted}, обновлено: {updated} прогнозных значений."
     except IntegrityError as e:
-        db.rollback()
         return f"Ошибка при коммите прогноза: {e}", 500
-    finally:
-        db.close()
-
-    return f"Загружено: {inserted}, обновлено: {updated} прогнозных значений."
 
 @app.route('/sensors')
 def show_sensors():
-    db = SessionLocal()
-    sensors = db.query(Sensor).order_by(Sensor.sensor_id).all()
-    db.close()
+    from init_db import Sensor
+    with SessionLocal() as db:
+        sensors = db.query(Sensor).order_by(Sensor.sensor_id).all()
     return render_template('sensors.html', sensors=sensors)
 
 @app.route('/data', methods=['GET', 'POST'])
 def show_data():
+    from init_db import Sensor, Measurement
     selected_sensor_id = request.args.get('sensor_id')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
 
-    # ЕСЛИ нет ни одного фильтра (первый заход) → редирект с дефолтным фильтром
     if not start_date and not end_date and not selected_sensor_id:
         default_start = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
         default_end = (datetime.now()).strftime('%Y-%m-%d')
         return redirect(url_for('show_data', start_date=default_start, end_date=default_end))
-    
+
     with SessionLocal() as db:
         sensors = db.query(Sensor).all()
         query = db.query(Measurement)
+
         if selected_sensor_id and selected_sensor_id.isdigit():
             query = query.filter(Measurement.sensor_id == int(selected_sensor_id))
 
         if start_date:
+            if len(start_date) == 10:
+                start_date += ' 00:00:00'
             try:
-                # Приводим к datetime если это дата без времени
-                if len(start_date) == 10:
-                    start_date += ' 00:00:00'
                 start_dt = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
                 query = query.filter(Measurement.measurement_time >= start_dt)
             except Exception as e:
                 print(f"Ошибка парсинга start_date: {e}")
 
         if end_date:
+            if len(end_date) == 10:
+                end_date += ' 23:59:59'
             try:
-                if len(end_date) == 10:
-                    end_date += ' 23:59:59'
                 end_dt = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S')
                 query = query.filter(Measurement.measurement_time <= end_dt)
             except Exception as e:
                 print(f"Ошибка парсинга end_date: {e}")
 
         measurements = query.order_by(Measurement.measurement_time.desc()).all()
-
         chart_labels = [m.measurement_time.strftime('%Y-%m-%d %H:%M:%S') for m in measurements]
         chart_values = [m.value for m in measurements]
-    
+
     return render_template(
         'data.html',
         sensors=sensors,
@@ -228,21 +221,22 @@ def show_data():
 
 @app.route('/compare_select', methods=['GET'])
 def compare_select():
-    db = SessionLocal()
-    sensors_actual = db.query(Sensor).filter(
-        Sensor.sensor_type == 'radiation',
-        ~Sensor.sensor_name.ilike('%forecast%')
-    ).order_by(Sensor.sensor_name).all()
+    from init_db import Sensor
+    from collections import namedtuple
+    with SessionLocal() as db:
+        sensors_actual = db.query(Sensor).filter(
+            Sensor.sensor_type == 'radiation',
+            ~Sensor.sensor_name.ilike('%forecast%')
+        ).order_by(Sensor.sensor_name).all()
 
-    sensors_forecast = db.query(Sensor).filter(
-        Sensor.sensor_type == 'radiation',
-        Sensor.sensor_name.ilike('%forecast%')
-    ).order_by(Sensor.sensor_name).all()
+        sensors_forecast = db.query(Sensor).filter(
+            Sensor.sensor_type == 'radiation',
+            Sensor.sensor_name.ilike('%forecast%')
+        ).order_by(Sensor.sensor_name).all()
 
     FakeSensor = namedtuple('FakeSensor', ['sensor_id', 'sensor_name'])
     sensors_actual.append(FakeSensor(sensor_id=-1, sensor_name='Среднее по всем фактическим'))
 
-    db.close()
     return render_template('compare_select.html', sensors_actual=sensors_actual, sensors_forecast=sensors_forecast)
 
 @app.route('/compare', methods=['GET'])
@@ -337,7 +331,6 @@ def compare_table():
         return redirect(url_for("compare_select"))
     finally:
         db.close()
-
 
 if __name__ == '__main__':
     app.run(debug=True, use_reloader=False)
