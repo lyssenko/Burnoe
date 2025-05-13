@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8">
     <title>Данные из базы</title>
@@ -15,38 +16,48 @@
             color: white;
             text-decoration: none;
         }
+
         .button:hover {
             background-color: #45a049;
         }
+
         .form-inline {
             display: flex;
             align-items: center;
             margin-bottom: 20px;
         }
-        .form-inline input, .form-inline select {
+
+        .form-inline input,
+        .form-inline select {
             margin-right: 10px;
             padding: 5px;
         }
+
         .table-container {
             max-height: 400px;
             overflow-y: auto;
             border: 1px solid #ccc;
             margin-bottom: 20px;
         }
+
         table {
             width: 100%;
             border-collapse: collapse;
         }
-        th, td {
+
+        th,
+        td {
             border: 1px solid #ccc;
             padding: 8px;
             text-align: left;
         }
+
         th {
             background-color: #f2f2f2;
         }
     </style>
 </head>
+
 <body>
     <h1>Данные измерений</h1>
 
@@ -55,17 +66,18 @@
         <select name="sensor_id" id="sensor">
             <option value="">-- Все сенсоры --</option>
             {% for sensor in sensors %}
-                <option value="{{ sensor.sensor_id }}" {% if sensor.sensor_id|string == selected_sensor_id %}selected{% endif %}>
-                    {{ sensor.sensor_id }} - {{ sensor.sensor_name }}
-                </option>
+            <option value="{{ sensor.sensor_id }}"
+                {% if sensor.sensor_id|string == selected_sensor_id %}selected{% endif %}>
+                {{ sensor.sensor_id }} - {{ sensor.sensor_name }}
+            </option>
             {% endfor %}
         </select>
 
         <label for="start_date">Начальная дата:</label>
-        <input type="date" name="start_date" id="start_date" value="{{ start_date }}">
+        <input type="date" name="start_date" id="start_date" value="{{ start_date[:10] if start_date }}">
 
         <label for="end_date">Конечная дата:</label>
-        <input type="date" name="end_date" id="end_date" value="{{ end_date }}">
+        <input type="date" name="end_date" id="end_date" value="{{ end_date[:10] if end_date }}">
 
         <input type="submit" value="Применить фильтры" class="button">
     </form>
@@ -83,29 +95,27 @@
             </thead>
             <tbody>
                 {% for row in measurements %}
-                    <tr>
-                        <td>{{ row.measurement_id }}</td>
-                        <td>{{ row.sensor_id }}</td>
-                        <td>{{ row.measurement_time }}</td>
-                        <td>{{ row.value }}</td>
-                    </tr>
+                <tr>
+                    <td>{{ row.measurement_id }}</td>
+                    <td>{{ row.sensor_id }}</td>
+                    <td>{{ row.measurement_time }}</td>
+                    <td>{{ row.value }}</td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-
+    <canvas id="myChart" width="800" height="400"></canvas>
     <br><a href="/">← Назад</a>
 </body>
-</html>
 
-<canvas id="myChart" width="800" height="400"></canvas>
+</html>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     const ctx = document.getElementById('myChart').getContext('2d');
     const labels = JSON.parse('{{ chart_labels | tojson | safe }}');
     const data = JSON.parse('{{ chart_values | tojson | safe }}');
-
     new Chart(ctx, {
         type: 'line',
         data: {
@@ -140,4 +150,3 @@
         }
     });
 </script>
-

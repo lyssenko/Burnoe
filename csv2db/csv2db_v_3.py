@@ -1,11 +1,16 @@
 from sqlalchemy.orm import scoped_session
 from db_session import SessionLocal
-from init_db import Sensor, Measurement, Base
+from init_db import Sensor, Measurement
 from datetime import datetime, timedelta
-from flask import flash, redirect, url_for, Flask, request, render_template
+from flask import Flask, request, render_template, redirect, url_for
 import pandas as pd
 from collections import namedtuple, defaultdict
-
+from helpers.comparison_utils import (
+    get_sensor_names,
+    get_measurements,
+    get_avg_measurements_for_all,
+    get_common_time_series
+)
 
 app = Flask(__name__)
 
@@ -166,38 +171,46 @@ def show_sensors():
 
 @app.route('/data', methods=['GET', 'POST'])
 def show_data():
-    db = SessionLocal()
-    sensors = db.query(Sensor).all()
-
     selected_sensor_id = request.args.get('sensor_id')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
 
-    query = db.query(Measurement)
-    if selected_sensor_id:
-        query = query.filter(Measurement.sensor_id == int(selected_sensor_id))
+    # ЕСЛИ нет ни одного фильтра (первый заход) → редирект с дефолтным фильтром
+    if not start_date and not end_date and not selected_sensor_id:
+        default_start = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        default_end = (datetime.now()).strftime('%Y-%m-%d')
+        return redirect(url_for('show_data', start_date=default_start, end_date=default_end))
+    
+    with SessionLocal() as db:
+        sensors = db.query(Sensor).all()
+        query = db.query(Measurement)
+        if selected_sensor_id and selected_sensor_id.isdigit():
+            query = query.filter(Measurement.sensor_id == int(selected_sensor_id))
 
-    if start_date:
-        try:
-            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-            query = query.filter(Measurement.measurement_time >= start_dt)
-        except ValueError as e:
-            print(f"Ошибка парсинга start_date: {e}")
+        if start_date:
+            try:
+                # Приводим к datetime если это дата без времени
+                if len(start_date) == 10:
+                    start_date += ' 00:00:00'
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
+                query = query.filter(Measurement.measurement_time >= start_dt)
+            except Exception as e:
+                print(f"Ошибка парсинга start_date: {e}")
 
-    if end_date:
-        try:
-            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
-            query = query.filter(Measurement.measurement_time < end_dt)
-        except ValueError as e:
-            print(f"Ошибка парсинга end_date: {e}")
+        if end_date:
+            try:
+                if len(end_date) == 10:
+                    end_date += ' 23:59:59'
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S')
+                query = query.filter(Measurement.measurement_time <= end_dt)
+            except Exception as e:
+                print(f"Ошибка парсинга end_date: {e}")
 
-    measurements = query.order_by(Measurement.measurement_time.desc()).all()
+        measurements = query.order_by(Measurement.measurement_time.desc()).all()
 
-    chart_labels = [m.measurement_time.strftime('%Y-%m-%d %H:%M:%S') for m in measurements]
-    chart_values = [m.value for m in measurements]
-
-    db.close()
-
+        chart_labels = [m.measurement_time.strftime('%Y-%m-%d %H:%M:%S') for m in measurements]
+        chart_values = [m.value for m in measurements]
+    
     return render_template(
         'data.html',
         sensors=sensors,
@@ -231,217 +244,96 @@ def compare_select():
 @app.route('/compare', methods=['GET'])
 def compare():
     db = SessionLocal()
+    try:
+        actual_id = int(request.args.get("sensor_actual_id"))
+        forecast_id = int(request.args.get("sensor_forecast_id"))
+        start_dt = datetime.strptime(request.args.get("start_date"), "%Y-%m-%d")
+        end_dt_raw = request.args.get("end_date")
+        end_dt = datetime.strptime(end_dt_raw, "%Y-%m-%d") + timedelta(days=1) if end_dt_raw else start_dt + timedelta(days=1)
 
-    sensor_actual_id = request.args.get("sensor_actual_id")
-    sensor_forecast_id = request.args.get("sensor_forecast_id")
-    start_date = request.args.get("start_date")
-    end_date = request.args.get("end_date")
+        actual_name, forecast_name = get_sensor_names(db, actual_id, forecast_id)
 
-    if not (sensor_actual_id and sensor_forecast_id and start_date):
-        db.close()
+        actual_data = (
+            get_avg_measurements_for_all(db, start_dt, end_dt)
+            if actual_id == -1 else get_measurements(db, actual_id, start_dt, end_dt)
+        )
+        forecast_data = get_measurements(db, forecast_id, start_dt, end_dt)
+
+        labels, actual_dict, forecast_dict = get_common_time_series(actual_data, forecast_data)
+
+        return render_template("compare.html",
+                               chart_labels=[dt.strftime("%Y-%m-%d %H:%M:%S") for dt in labels],
+                               actual_values=[actual_dict.get(t) for t in labels],
+                               forecast_values=[forecast_dict.get(t) for t in labels],
+                               actual_name=actual_name,
+                               forecast_name=forecast_name)
+    except Exception as e:
+        print(f"Ошибка в /compare: {e}")
         return redirect(url_for("compare_select"))
-
-    try:
-        sensor_actual_id = int(sensor_actual_id)
-        sensor_forecast_id = int(sensor_forecast_id)
-    except ValueError:
+    finally:
         db.close()
-        return "Некорректный формат ID сенсора", 400
 
-    try:
-        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-    except ValueError:
-        db.close()
-        return "Неверный формат начальной даты", 400
-
-    if end_date:
-        try:
-            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
-        except ValueError:
-            db.close()
-            return "Неверный формат конечной даты", 400
-    else:
-        end_dt = start_dt + timedelta(days=1)
-
-    actual_name = "Среднее" if sensor_actual_id == -1 else db.get(Sensor, sensor_actual_id).sensor_name
-    forecast_name = db.get(Sensor, sensor_forecast_id).sensor_name
-
-
-    if sensor_actual_id == -1:
-        sensors = db.query(Sensor).filter(
-            Sensor.sensor_type == 'radiation',
-            ~Sensor.sensor_name.ilike('%forecast%')
-        ).all()
-        all_ids = [s.sensor_id for s in sensors]
-
-        all_data = db.query(Measurement).filter(
-            Measurement.sensor_id.in_(all_ids),
-            Measurement.measurement_time >= start_dt,
-            Measurement.measurement_time < end_dt
-        ).all()
-
-        from collections import defaultdict
-        time_group = defaultdict(list)
-        for m in all_data:
-            time_group[m.measurement_time].append(m.value)
-
-        actual_data = []
-        for t, vals in time_group.items():
-            valid_vals = [v if v is not None and v >= 0 else 0 for v in vals]
-            if valid_vals:
-                avg = sum(valid_vals) / len(valid_vals)
-                actual_data.append(type('Obj', (), {'measurement_time': t, 'value': avg}))
-    else:
-        actual_data = db.query(Measurement).filter(
-            Measurement.sensor_id == sensor_actual_id,
-            Measurement.measurement_time >= start_dt,
-            Measurement.measurement_time < end_dt
-        ).order_by(Measurement.measurement_time).all()
-
-    forecast_data = db.query(Measurement).filter(
-        Measurement.sensor_id == sensor_forecast_id,
-        Measurement.measurement_time >= start_dt,
-        Measurement.measurement_time < end_dt
-    ).order_by(Measurement.measurement_time).all()
-
-    db.close()
-
-    label_set = sorted(set([m.measurement_time for m in actual_data] + [m.measurement_time for m in forecast_data]))
-    label_strs = [dt.strftime("%Y-%m-%d %H:%M:%S") for dt in label_set]
-    actual_dict = {m.measurement_time: m.value for m in actual_data}
-    forecast_dict = {m.measurement_time: m.value for m in forecast_data}
-
-    actual_values = [actual_dict.get(t, None) for t in label_set]
-    forecast_values = [forecast_dict.get(t, None) for t in label_set]
-
-    return render_template(
-        "compare.html",
-        chart_labels=label_strs,
-        actual_values=actual_values,
-        forecast_values=forecast_values,
-        actual_name=actual_name,
-        forecast_name=forecast_name
-    )
 
 @app.route('/compare_table', methods=['GET'])
 def compare_table():
     db = SessionLocal()
+    try:
+        actual_id = int(request.args.get("sensor_actual_id"))
+        forecast_id = int(request.args.get("sensor_forecast_id"))
+        start_dt = datetime.strptime(request.args.get("start_date"), "%Y-%m-%d")
+        end_dt_raw = request.args.get("end_date")
+        end_dt = datetime.strptime(end_dt_raw, "%Y-%m-%d") + timedelta(days=1) if end_dt_raw else start_dt + timedelta(days=1)
 
-    sensor_actual_id = request.args.get("sensor_actual_id")
-    sensor_forecast_id = request.args.get("sensor_forecast_id")
-    start_date = request.args.get("start_date")
-    end_date = request.args.get("end_date")
+        actual_name, forecast_name = get_sensor_names(db, actual_id, forecast_id)
 
-    if not (sensor_actual_id and sensor_forecast_id and start_date):
-        db.close()
+        actual_data = (
+            get_avg_measurements_for_all(db, start_dt, end_dt)
+            if actual_id == -1 else get_measurements(db, actual_id, start_dt, end_dt)
+        )
+        forecast_data = get_measurements(db, forecast_id, start_dt, end_dt)
+
+        # группировка по часам
+        from collections import defaultdict
+        actual_hourly = defaultdict(list)
+        forecast_hourly = defaultdict(list)
+
+        for m in actual_data:
+            hour = m.measurement_time.replace(minute=0, second=0, microsecond=0)
+            actual_hourly[hour].append(m.value)
+
+        for m in forecast_data:
+            hour = m.measurement_time.replace(minute=0, second=0, microsecond=0)
+            forecast_hourly[hour].append(m.value)
+
+        all_hours = sorted(set(actual_hourly.keys()).union(forecast_hourly.keys()))
+
+        comparison_rows = []
+        for hour in all_hours:
+            a_vals = [v if v is not None and v >= 0 else 0 for v in actual_hourly.get(hour, [])]
+            f_vals = [v if v is not None and v >= 0 else 0 for v in forecast_hourly.get(hour, [])]
+
+            a_sum = sum(a_vals) if a_vals else None
+            f_sum = sum(f_vals) if f_vals else None
+            err = a_sum - f_sum if a_sum is not None and f_sum is not None else None
+            percent = ((err / a_sum) * 100) if a_sum and err is not None else None
+
+            comparison_rows.append({
+                'time': hour.strftime("%Y-%m-%d %H:00"),
+                'actual': round(a_sum, 3) if a_sum is not None else '',
+                'forecast': round(f_sum, 3) if f_sum is not None else '',
+                'error': round(err, 3) if err is not None else '',
+                'percent': round(percent, 2) if percent is not None else ''
+            })
+
+        return render_template("compare_table.html",
+                               comparison_rows=comparison_rows,
+                               actual_name=actual_name,
+                               forecast_name=forecast_name)
+    except Exception as e:
+        print(f"Ошибка в /compare_table: {e}")
         return redirect(url_for("compare_select"))
-
-    try:
-        sensor_actual_id = int(sensor_actual_id)
-        sensor_forecast_id = int(sensor_forecast_id)
-    except ValueError:
+    finally:
         db.close()
-        return "Некорректный формат ID сенсора", 400
-
-    try:
-        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-    except ValueError:
-        db.close()
-        return "Неверный формат начальной даты", 400
-
-    if end_date:
-        try:
-            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
-        except ValueError:
-            db.close()
-            return "Неверный формат конечной даты", 400
-    else:
-        end_dt = start_dt + timedelta(days=1)
-
-    actual_name = "Среднее" if sensor_actual_id == -1 else db.get(Sensor, sensor_actual_id).sensor_name
-    forecast_name = db.get(Sensor, sensor_forecast_id).sensor_name
-
-
-    if sensor_actual_id == -1:
-        sensors = db.query(Sensor).filter(
-            Sensor.sensor_type == 'radiation',
-            ~Sensor.sensor_name.ilike('%forecast%')
-        ).all()
-        all_ids = [s.sensor_id for s in sensors]
-
-        all_data = db.query(Measurement).filter(
-            Measurement.sensor_id.in_(all_ids),
-            Measurement.measurement_time >= start_dt,
-            Measurement.measurement_time < end_dt
-        ).all()
-
-        time_group = defaultdict(list)
-        for m in all_data:
-            time_group[m.measurement_time].append(m.value)
-
-        actual_data = []
-        for t, vals in time_group.items():
-            valid_vals = [v for v in vals if v is not None]
-            if valid_vals:
-                avg = sum(valid_vals) / len(valid_vals)
-                actual_data.append(type('Obj', (), {'measurement_time': t, 'value': avg}))
-    else:
-        actual_data = db.query(Measurement).filter(
-            Measurement.sensor_id == sensor_actual_id,
-            Measurement.measurement_time >= start_dt,
-            Measurement.measurement_time < end_dt
-        ).order_by(Measurement.measurement_time).all()
-
-    forecast_data = db.query(Measurement).filter(
-        Measurement.sensor_id == sensor_forecast_id,
-        Measurement.measurement_time >= start_dt,
-        Measurement.measurement_time < end_dt
-    ).order_by(Measurement.measurement_time).all()
-
-    db.close()
-
-    label_set = sorted(set([m.measurement_time for m in actual_data] + [m.measurement_time for m in forecast_data]))
-    actual_dict = {m.measurement_time: m.value for m in actual_data}
-    forecast_dict = {m.measurement_time: m.value for m in forecast_data}
-
-    comparison_rows = []
-    actual_hourly = defaultdict(list)
-    forecast_hourly = defaultdict(list)
-
-    for m in actual_data:
-        hour = m.measurement_time.replace(minute=0, second=0, microsecond=0)
-        actual_hourly[hour].append(m.value)
-
-    for m in forecast_data:
-        hour = m.measurement_time.replace(minute=0, second=0, microsecond=0)
-        forecast_hourly[hour].append(m.value)
-
-    all_hours = sorted(set(actual_hourly.keys()).union(forecast_hourly.keys()))
-    for hour in all_hours:
-        a_vals = [v if v is not None and v >= 0 else 0 for v in actual_hourly.get(hour, [])]
-        f_vals = [v if v is not None and v >= 0 else 0 for v in forecast_hourly.get(hour, [])]
-
-
-        a_sum = sum(a_vals) if a_vals else None
-        f_sum = sum(f_vals) if f_vals else None
-        err = a_sum - f_sum if a_sum is not None and f_sum is not None else None
-
-        percent = ((err / a_sum) * 100) if a_sum and err is not None else None
-
-        comparison_rows.append({
-            'time': hour.strftime("%Y-%m-%d %H:00"),
-            'actual': round(a_sum, 3) if a_sum is not None else '',
-            'forecast': round(f_sum, 3) if f_sum is not None else '',
-            'error': round(err, 3) if err is not None else '',
-            'percent': round(percent, 2) if percent is not None else ''
-        })
-
-    return render_template(
-        "compare_table.html",
-        comparison_rows=comparison_rows,
-        actual_name=actual_name,
-        forecast_name=forecast_name
-    )
 
 
 if __name__ == '__main__':

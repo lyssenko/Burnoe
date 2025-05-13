@@ -5,6 +5,7 @@ __pycache__/
 *.pyo
 *.pyd
 *.so
+csv2db/clear.py
 
 # Virtual environment
 venv/
