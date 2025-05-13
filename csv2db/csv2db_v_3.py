@@ -4,13 +4,16 @@ from init_db import Sensor, Measurement
 from datetime import datetime, timedelta
 from flask import Flask, request, render_template, redirect, url_for
 import pandas as pd
-from collections import namedtuple, defaultdict
+from collections import namedtuple
 from helpers.comparison_utils import (
     get_sensor_names,
     get_measurements,
     get_avg_measurements_for_all,
-    get_common_time_series
+    get_common_time_series,
+    get_sensor_id,
+    determine_sensor_params
 )
+
 
 app = Flask(__name__)
 
@@ -25,26 +28,8 @@ def upload():
         return "Файл(ы) не выбраны", 400
 
     db = scoped_session(SessionLocal)
-
-    def get_sensor_id(sensor_name, sensor_type, unit):
-        sensor = db.query(Sensor).filter_by(sensor_name=sensor_name).first()
-        if sensor:
-            return sensor.sensor_id
-        new_sensor = Sensor(sensor_name=sensor_name, sensor_type=sensor_type, unit=unit)
-        db.add(new_sensor)
-        db.flush()
-        return new_sensor.sensor_id
-
-    def determine_sensor_params(col_name):
-        lower = col_name.lower()
-        if "irradiation" in lower or "pyranometer" in lower:
-            return "radiation", "W/m2"
-        elif "wind" in lower or "ветра" in lower:
-            return "wind", "m/s"
-        elif "temp" in lower or "temperature" in lower or "температура" in lower:
-            return "temperature", "℃"
-        else:
-            return "unknown", "unknown"
+    total_inserted = 0
+    errors = []
 
     for file in files:
         if not file.filename:
@@ -52,7 +37,11 @@ def upload():
         try:
             df = pd.read_csv(file, sep=';')
         except Exception as e:
-            print(f"Ошибка чтения файла {file.filename}: {e}")
+            errors.append(f"Ошибка чтения {file.filename}: {e}")
+            continue
+
+        if df.shape[1] < 3:
+            errors.append(f"Файл {file.filename} содержит недостаточно столбцов.")
             continue
 
         if df.iloc[0, 0].strip().startswith('['):
@@ -60,38 +49,54 @@ def upload():
 
         sensor_cols = df.columns[2:]
         sensor_map = {}
+
         for col in sensor_cols:
             sensor_name = col.replace(".irradiation_raw", "").strip()
             sensor_type, unit = determine_sensor_params(col)
-            sensor_id = get_sensor_id(sensor_name, sensor_type, unit)
+            sensor_id = get_sensor_id(db, sensor_name, sensor_type, unit)
             sensor_map[col] = sensor_id
 
-        for index, row in df.iterrows():
-            try:
-                date_str = str(row.iloc[0]).strip()
-                time_str = str(row.iloc[1]).strip()
-                dt = datetime.strptime(f"{date_str} {time_str}", "%d.%m.%Y %H:%M:%S")
-            except Exception as e:
-                print(f"Ошибка парсинга даты в строке {index}: {e}")
-                continue
+        total_inserted += process_measurements(df, sensor_cols, sensor_map, db, file.filename, errors)
 
-            for col in sensor_cols:
-                try:
-                    value = row[col]
-                    sensor_id = sensor_map[col]
-                    m = Measurement(sensor_id=sensor_id, measurement_time=dt, value=value)
-                    db.add(m)
-                except Exception as e:
-                    print(f"Ошибка в строке {index}, столбец {col}: {e}")
     try:
         db.commit()
     except Exception as e:
-        print(f"Ошибка при коммите: {e}")
         db.rollback()
+        return f"Ошибка при сохранении данных: {e}", 500
     finally:
         db.close()
 
-    return "Данные успешно загружены в базу данных."
+    if errors:
+        msg = f"Загружено {total_inserted} измерений, но возникли ошибки:\n" + "\n".join(errors[:10])
+        if len(errors) > 10:
+            msg += f"\n... и ещё {len(errors) - 10} ошибок скрыто."
+        return msg, 400
+
+    return f"Данные успешно загружены. Всего записей: {total_inserted}."
+
+
+def process_measurements(df, sensor_cols, sensor_map, db, filename, errors):
+    inserted = 0
+    for index, row in df.iterrows():
+        try:
+            date_str = str(row.iloc[0]).strip()
+            time_str = str(row.iloc[1]).strip()
+            dt = datetime.strptime(f"{date_str} {time_str}", "%d.%m.%Y %H:%M:%S")
+        except Exception as e:
+            errors.append(f"{filename}, строка {index+2}: ошибка даты/времени — {e}")
+            continue
+
+        for col in sensor_cols:
+            try:
+                value = float(row[col])
+                sensor_id = sensor_map[col]
+                m = Measurement(sensor_id=sensor_id, measurement_time=dt, value=value)
+                db.add(m)
+                inserted += 1
+            except Exception as e:
+                errors.append(f"{filename}, строка {index+2}, столбец '{col}': {e}")
+    return inserted
+
 
 @app.route('/upload_forecast', methods=['POST'])
 def upload_forecast():
@@ -167,7 +172,6 @@ def show_sensors():
     sensors = db.query(Sensor).order_by(Sensor.sensor_id).all()
     db.close()
     return render_template('sensors.html', sensors=sensors)
-
 
 @app.route('/data', methods=['GET', 'POST'])
 def show_data():
@@ -272,7 +276,6 @@ def compare():
         return redirect(url_for("compare_select"))
     finally:
         db.close()
-
 
 @app.route('/compare_table', methods=['GET'])
 def compare_table():

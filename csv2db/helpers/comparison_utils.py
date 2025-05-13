@@ -53,3 +53,24 @@ def get_common_time_series(actual_data, forecast_data):
     forecast_dict = {m.measurement_time: m.value for m in forecast_data}
 
     return all_times, actual_dict, forecast_dict
+
+def get_sensor_id(db, sensor_name, sensor_type, unit):
+    from init_db import Sensor
+    sensor = db.query(Sensor).filter_by(sensor_name=sensor_name).first()
+    if sensor:
+        return sensor.sensor_id
+    new_sensor = Sensor(sensor_name=sensor_name, sensor_type=sensor_type, unit=unit)
+    db.add(new_sensor)
+    db.flush()
+    return new_sensor.sensor_id
+
+def determine_sensor_params(col_name):
+    lower = col_name.lower()
+    if "irradiation" in lower or "pyranometer" in lower:
+        return "radiation", "W/m2"
+    elif "wind" in lower or "ветра" in lower:
+        return "wind", "m/s"
+    elif "temp" in lower or "temperature" in lower or "температура" in lower:
+        return "temperature", "℃"
+    else:
+        return "unknown", "unknown"
