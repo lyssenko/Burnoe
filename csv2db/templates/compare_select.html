@@ -37,7 +37,7 @@
         <label for="sensor_actual_id">Сенсор фактических измерений:</label>
         <select name="sensor_actual_id" id="sensor_actual_id" required>
             {% for sensor in sensors_actual %}
-            <option value="{{ sensor.sensor_id }}">{{ sensor.sensor_name }}</option>
+            <option value="{{ sensor.sensor_id }}">{{ sensor.sensor_name }} ({{ sensor.sensor_type }})</option>
             {% endfor %}
         </select>
 
@@ -46,7 +46,7 @@
         <label for="sensor_forecast_id">Сенсор прогноза:</label>
         <select name="sensor_forecast_id" id="sensor_forecast_id" required>
             {% for sensor in sensors_forecast %}
-            <option value="{{ sensor.sensor_id }}">{{ sensor.sensor_name }}</option>
+            <option value="{{ sensor.sensor_id }}">{{ sensor.sensor_name }} ({{ sensor.sensor_type }})</option>
             {% endfor %}
         </select>
 

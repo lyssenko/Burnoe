@@ -1,3 +1,6 @@
+import re
+from sqlite3 import IntegrityError
+from sqlalchemy import insert
 from sqlalchemy.orm import scoped_session
 from db_session import SessionLocal
 from init_db import Sensor, Measurement
@@ -5,6 +8,8 @@ from datetime import datetime, timedelta
 from flask import Flask, request, render_template, redirect, url_for
 import pandas as pd
 from collections import defaultdict, namedtuple
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
 from comparison_utils import (
     get_sensor_names,
     get_sensor_id,
@@ -13,7 +18,6 @@ from comparison_utils import (
     process_measurements,
     compare_sensors
 )
-
 
 app = Flask(__name__)
 
@@ -75,71 +79,84 @@ def upload():
 
 @app.route('/upload_forecast', methods=['POST'])
 def upload_forecast():
-    from sqlalchemy.exc import IntegrityError
     file = request.files.get('forecastFile')
     if not file or not file.filename:
         return "Файл прогноза не выбран", 400
 
-    db = scoped_session(SessionLocal)
-
-    sensor_name = "B1_forecast"
-    sensor_type = "radiation"
-    unit = "W/m2"
-
-    sensor = db.query(Sensor).filter_by(sensor_name=sensor_name).first()
-    if sensor:
-        sensor_id = sensor.sensor_id
+    filename_lower = file.filename.lower()
+    if 'energy' in filename_lower:
+        sensor_name = "Forecast Energy"
+        sensor_type = "energy_active"
+        unit = "kWh"
+    elif 'irrad' in filename_lower:
+        sensor_name = "Forecast Radiation"
+        sensor_type = "radiation"
+        unit = "W/m2"
     else:
-        sensor = Sensor(sensor_name=sensor_name, sensor_type=sensor_type, unit=unit)
-        db.add(sensor)
-        db.flush()
-        sensor_id = sensor.sensor_id
+        return "Имя файла должно содержать 'energy' или 'irrad' для определения типа прогноза", 400
 
     try:
         df = pd.read_csv(file)
-        df = df.rename(columns={"Time": "time", "rad": "radiation"})
-        if 'time' not in df.columns or 'radiation' not in df.columns:
-            return "Ошибка: файл должен содержать столбцы 'time' и 'radiation'", 400
+        df.columns = [col.strip().lower() for col in df.columns]
+        if 'time' in df.columns and 'p' in df.columns:
+            df = df.rename(columns={'p': 'radiation'})
+        elif 'time' in df.columns and 'rad' in df.columns:
+            df = df.rename(columns={'rad': 'radiation'})
+        elif 'time' in df.columns and 'radiation' in df.columns:
+            pass
+        else:
+            return "Ошибка: файл должен содержать столбцы 'Time' и 'P', 'rad' или 'radiation'", 400
     except Exception as e:
-        db.close()
         return f"Ошибка чтения файла прогноза: {e}", 400
 
     try:
         base_name = file.filename.split('/')[-1]
-        date_str = base_name.replace("irrad_", "").replace(".csv", "")
-        forecast_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        date_str = re.search(r'(\d{4}-\d{2}-\d{2})', base_name)
+        if date_str:
+            forecast_date = datetime.strptime(date_str.group(1), "%Y-%m-%d").date()
+        else:
+            forecast_date = datetime.today().date()
     except Exception:
         forecast_date = datetime.today().date()
 
     inserted = 0
-    updated = 0
 
-    for _, row in df.iterrows():
-        try:
-            time_obj = datetime.strptime(row['time'], "%H:%M:%S").time()
-            dt = datetime.combine(forecast_date, time_obj)
-            value = float(row['radiation'])
+    with SessionLocal() as db:
+        sensor = db.query(Sensor).filter_by(sensor_name=sensor_name).first()
+        if sensor:
+            sensor_id = sensor.sensor_id
+        else:
+            sensor = Sensor(sensor_name=sensor_name, sensor_type=sensor_type, unit=unit)
+            db.add(sensor)
+            db.flush()
+            sensor_id = sensor.sensor_id
 
-            existing = db.query(Measurement).filter_by(sensor_id=sensor_id, measurement_time=dt).first()
-            if existing:
-                existing.value = value
-                updated += 1
-            else:
-                m = Measurement(sensor_id=sensor_id, measurement_time=dt, value=value)
-                db.add(m)
+        for _, row in df.iterrows():
+            try:
+                time_obj = datetime.strptime(row['time'], "%H:%M:%S").time()
+                dt = datetime.combine(forecast_date, time_obj)
+                value = float(row['radiation'])
+
+                stmt = sqlite_insert(Measurement).values(
+                    sensor_id=sensor_id,
+                    measurement_time=dt,
+                    value=value
+                ).on_conflict_do_update(
+                    index_elements=["sensor_id", "measurement_time"],
+                    set_={"value": value}
+                )
+                db.execute(stmt)
                 inserted += 1
-        except Exception as e:
-            print(f"Ошибка прогноза в строке: {e}")
+            except Exception as e:
+                print(f"Ошибка прогноза в строке: {e}")
 
-    try:
-        db.commit()
-    except IntegrityError as e:
-        db.rollback()
-        return f"Ошибка при коммите прогноза: {e}", 500
-    finally:
-        db.close()
+        try:
+            db.commit()
+        except IntegrityError as e:
+            db.rollback()
+            return f"Ошибка при коммите прогноза: {e}", 500
 
-    return f"Загружено: {inserted}, обновлено: {updated} прогнозных значений."
+    return f"Загружено: {inserted} прогнозных значений."
 
 @app.route('/sensors')
 def show_sensors():
@@ -196,13 +213,12 @@ def show_data():
 @app.route('/compare_select', methods=['GET'])
 def compare_select():
     db = SessionLocal()
+    
     sensors_actual = db.query(Sensor).filter(
-        Sensor.sensor_type == 'radiation',
         ~Sensor.sensor_name.ilike('%forecast%')
     ).order_by(Sensor.sensor_name).all()
 
     sensors_forecast = db.query(Sensor).filter(
-        Sensor.sensor_type == 'radiation',
         Sensor.sensor_name.ilike('%forecast%')
     ).order_by(Sensor.sensor_name).all()
 
@@ -211,6 +227,7 @@ def compare_select():
 
     db.close()
     return render_template('compare_select.html', sensors_actual=sensors_actual, sensors_forecast=sensors_forecast)
+
 
 @app.route('/compare', methods=['GET'])
 def compare():
@@ -281,8 +298,7 @@ def compare_table():
 
     if sensor_actual_id == -1:
         sensors = db.query(Sensor).filter(
-            Sensor.sensor_type == 'radiation',
-            ~Sensor.sensor_name.ilike('%forecast%')
+          Sensor.sensor_name.ilike('%forecast%')
         ).all()
         all_ids = [s.sensor_id for s in sensors]
 
