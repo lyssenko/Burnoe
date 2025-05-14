@@ -7,7 +7,7 @@ Base = declarative_base()
 class Sensor(Base):
     __tablename__ = 'sensors'
 
-    sensor_id = Column(Integer, primary_key=True)
+    sensor_id = Column(Integer, primary_key=True, autoincrement=True)
     sensor_name = Column(String, nullable=False)
     sensor_type = Column(String, nullable=False)
     unit = Column(String, nullable=False)
@@ -18,7 +18,7 @@ class Sensor(Base):
 class Measurement(Base):
     __tablename__ = 'measurements'
 
-    measurement_id = Column(Integer, primary_key=True)
+    measurement_id = Column(Integer, primary_key=True, autoincrement=True)
     sensor_id = Column(Integer, ForeignKey('sensors.sensor_id'), nullable=False)
     measurement_time = Column(DateTime, nullable=False)
     value = Column(Float)

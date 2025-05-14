@@ -33,7 +33,7 @@
     <div class="section">
         <h2>Измеренные данные</h2>
         <form action="/upload" method="post" enctype="multipart/form-data">
-            <label for="dataFile">Выберите CSV/XLSX-файлы с измерениями:</label>
+            <label for="dataFile">Выберите файлы с измерениями:</label>
             <input type="file" name="dataFile" id="dataFile" accept=".csv" multiple>
             <br><br>
             <input type="submit" value="Загрузить измерения" class="button">
@@ -43,7 +43,7 @@
     <div class="section">
         <h2>Прогнозные данные</h2>
         <form action="/upload_forecast" method="post" enctype="multipart/form-data">
-            <label for="forecastFile">Выберите CSV/XLSX-файл с прогнозом радиации:</label>
+            <label for="forecastFile">Выберите файлы с прогнозом радиации:</label>
             <input type="file" name="forecastFile" id="forecastFile" accept=".csv">
             <br><br>
             <input type="submit" value="Загрузить прогноз" class="button">
