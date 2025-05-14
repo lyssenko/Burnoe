@@ -167,38 +167,46 @@ def show_sensors():
 
 @app.route('/data', methods=['GET', 'POST'])
 def show_data():
-    db = SessionLocal()
-    sensors = db.query(Sensor).all()
-
     selected_sensor_id = request.args.get('sensor_id')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
 
-    query = db.query(Measurement)
-    if selected_sensor_id:
-        query = query.filter(Measurement.sensor_id == int(selected_sensor_id))
+    # ЕСЛИ нет ни одного фильтра (первый заход) → редирект с дефолтным фильтром
+    if not start_date and not end_date and not selected_sensor_id:
+        default_start = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        default_end = (datetime.now()).strftime('%Y-%m-%d')
+        return redirect(url_for('show_data', start_date=default_start, end_date=default_end))
+    
+    with SessionLocal() as db:
+        sensors = db.query(Sensor).all()
+        query = db.query(Measurement)
+        if selected_sensor_id and selected_sensor_id.isdigit():
+            query = query.filter(Measurement.sensor_id == int(selected_sensor_id))
 
-    if start_date:
-        try:
-            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-            query = query.filter(Measurement.measurement_time >= start_dt)
-        except ValueError as e:
-            print(f"Ошибка парсинга start_date: {e}")
+        if start_date:
+            try:
+                # Приводим к datetime если это дата без времени
+                if len(start_date) == 10:
+                    start_date += ' 00:00:00'
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
+                query = query.filter(Measurement.measurement_time >= start_dt)
+            except Exception as e:
+                print(f"Ошибка парсинга start_date: {e}")
 
-    if end_date:
-        try:
-            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
-            query = query.filter(Measurement.measurement_time < end_dt)
-        except ValueError as e:
-            print(f"Ошибка парсинга end_date: {e}")
+        if end_date:
+            try:
+                if len(end_date) == 10:
+                    end_date += ' 23:59:59'
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S')
+                query = query.filter(Measurement.measurement_time <= end_dt)
+            except Exception as e:
+                print(f"Ошибка парсинга end_date: {e}")
 
-    measurements = query.order_by(Measurement.measurement_time.desc()).all()
+        measurements = query.order_by(Measurement.measurement_time.desc()).all()
 
-    chart_labels = [m.measurement_time.strftime('%Y-%m-%d %H:%M:%S') for m in measurements]
-    chart_values = [m.value for m in measurements]
-
-    db.close()
-
+        chart_labels = [m.measurement_time.strftime('%Y-%m-%d %H:%M:%S') for m in measurements]
+        chart_values = [m.value for m in measurements]
+    
     return render_template(
         'data.html',
         sensors=sensors,
