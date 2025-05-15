@@ -79,76 +79,82 @@ def upload():
 
 @app.route('/upload_forecast', methods=['POST'])
 def upload_forecast():
-    file = request.files.get('forecastFile')
-    if not file or not file.filename:
-        return "Файл прогноза не выбран", 400
+    files = request.files.getlist('forecastFile')
+    if not files:
+        return "Файлы прогноза не выбраны", 400
 
-    filename_lower = file.filename.lower()
-    if 'energy' in filename_lower:
-        sensor_name = "Forecast Energy"
-        sensor_type = "energy_active"
-        unit = "kWh"
-    elif 'irrad' in filename_lower:
-        sensor_name = "Forecast Radiation"
-        sensor_type = "radiation"
-        unit = "W/m2"
-    else:
-        return "Имя файла должно содержать 'energy' или 'irrad' для определения типа прогноза", 400
-
-    try:
-        df = pd.read_csv(file)
-        df.columns = [col.strip().lower() for col in df.columns]
-        if 'time' in df.columns and 'p' in df.columns:
-            df = df.rename(columns={'p': 'radiation'})
-        elif 'time' in df.columns and 'rad' in df.columns:
-            df = df.rename(columns={'rad': 'radiation'})
-        elif 'time' in df.columns and 'radiation' in df.columns:
-            pass
-        else:
-            return "Ошибка: файл должен содержать столбцы 'Time' и 'P', 'rad' или 'radiation'", 400
-    except Exception as e:
-        return f"Ошибка чтения файла прогноза: {e}", 400
-
-    try:
-        base_name = file.filename.split('/')[-1]
-        date_str = re.search(r'(\d{4}-\d{2}-\d{2})', base_name)
-        if date_str:
-            forecast_date = datetime.strptime(date_str.group(1), "%Y-%m-%d").date()
-        else:
-            forecast_date = datetime.today().date()
-    except Exception:
-        forecast_date = datetime.today().date()
-
-    inserted = 0
-
+    total_inserted = 0
     with SessionLocal() as db:
-        sensor = db.query(Sensor).filter_by(sensor_name=sensor_name).first()
-        if sensor:
-            sensor_id = sensor.sensor_id
-        else:
-            sensor = Sensor(sensor_name=sensor_name, sensor_type=sensor_type, unit=unit)
-            db.add(sensor)
-            db.flush()
-            sensor_id = sensor.sensor_id
+        for file in files:
+            if not file or not file.filename:
+                continue
 
-        for _, row in df.iterrows():
+            filename_lower = file.filename.lower()
+            if 'energy' in filename_lower:
+                sensor_name = "Forecast Energy"
+                sensor_type = "energy_active"
+                unit = "kWh"
+            elif 'irrad' in filename_lower:
+                sensor_name = "Forecast Radiation"
+                sensor_type = "radiation"
+                unit = "W/m2"
+            else:
+                print(f"Пропущен файл: {file.filename} — не содержит 'energy' или 'irrad'")
+                continue
+
             try:
-                time_obj = datetime.strptime(row['time'], "%H:%M:%S").time()
-                dt = datetime.combine(forecast_date, time_obj)
-                value = float(row['radiation'])
-
-                stmt = sqlite_insert(Measurement).values(
-                    sensor_id=sensor_id,
-                    measurement_time=dt,
-                    value=value
-                ).on_conflict_do_update(
-                    index_elements=["sensor_id", "measurement_time"],
-                    set_={"value": value}
-                )
-                db.execute(stmt)
-                inserted += 1
+                df = pd.read_csv(file)
+                df.columns = [col.strip().lower() for col in df.columns]
+                if 'time' in df.columns and 'p' in df.columns:
+                    df = df.rename(columns={'p': 'radiation'})
+                elif 'time' in df.columns and 'rad' in df.columns:
+                    df = df.rename(columns={'rad': 'radiation'})
+                elif 'time' in df.columns and 'radiation' in df.columns:
+                    pass
+                else:
+                    print(f"Ошибка структуры в файле {file.filename}")
+                    continue
             except Exception as e:
-                print(f"Ошибка прогноза в строке: {e}")
+                print(f"Ошибка чтения {file.filename}: {e}")
+                continue
+
+            try:
+                base_name = file.filename.split('/')[-1]
+                date_str = re.search(r'(\d{4}-\d{2}-\d{2})', base_name)
+                if date_str:
+                    forecast_date = datetime.strptime(date_str.group(1), "%Y-%m-%d").date()
+                else:
+                    forecast_date = datetime.today().date()
+            except Exception:
+                forecast_date = datetime.today().date()
+
+            sensor = db.query(Sensor).filter_by(sensor_name=sensor_name).first()
+            if sensor:
+                sensor_id = sensor.sensor_id
+            else:
+                sensor = Sensor(sensor_name=sensor_name, sensor_type=sensor_type, unit=unit)
+                db.add(sensor)
+                db.flush()
+                sensor_id = sensor.sensor_id
+
+            for _, row in df.iterrows():
+                try:
+                    time_obj = datetime.strptime(row['time'], "%H:%M:%S").time()
+                    dt = datetime.combine(forecast_date, time_obj)
+                    value = float(row['radiation'])
+
+                    stmt = sqlite_insert(Measurement).values(
+                        sensor_id=sensor_id,
+                        measurement_time=dt,
+                        value=value
+                    ).on_conflict_do_update(
+                        index_elements=["sensor_id", "measurement_time"],
+                        set_={"value": value}
+                    )
+                    db.execute(stmt)
+                    total_inserted += 1
+                except Exception as e:
+                    print(f"Ошибка прогноза в строке: {e}")
 
         try:
             db.commit()
@@ -156,7 +162,7 @@ def upload_forecast():
             db.rollback()
             return f"Ошибка при коммите прогноза: {e}", 500
 
-    return f"Загружено: {inserted} прогнозных значений."
+    return f"Загружено: {total_inserted} прогнозных значений."
 
 @app.route('/sensors')
 def show_sensors():
@@ -170,8 +176,6 @@ def show_data():
     selected_sensor_id = request.args.get('sensor_id')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
-
-    # ЕСЛИ нет ни одного фильтра (первый заход) → редирект с дефолтным фильтром
     if not start_date and not end_date and not selected_sensor_id:
         default_start = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
         default_end = (datetime.now()).strftime('%Y-%m-%d')
@@ -185,7 +189,6 @@ def show_data():
 
         if start_date:
             try:
-                # Приводим к datetime если это дата без времени
                 if len(start_date) == 10:
                     start_date += ' 00:00:00'
                 start_dt = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
