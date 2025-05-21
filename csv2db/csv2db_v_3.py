@@ -416,5 +416,53 @@ def export_compare_table():
     return response
 
 
+from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
+
+@app.route("/compare_table/export_excel")
+def export_compare_table_excel():
+    db = SessionLocal()
+    actual_id = int(request.args.get("sensor_actual_id"))
+    forecast_id = int(request.args.get("sensor_forecast_id"))
+    start_date = datetime.strptime(request.args.get("start_date"), "%Y-%m-%d")
+    end_date = datetime.strptime(request.args.get("end_date"), "%Y-%m-%d") + timedelta(days=1)
+
+    actual_data = get_measurements(db, actual_id, start_date, end_date)
+    forecast_data = get_measurements(db, forecast_id, start_date, end_date)
+    labels, actual_dict, forecast_dict = get_common_time_series(actual_data, forecast_data)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Сравнение"
+
+    ws.append(["Время", "Факт", "Прогноз", "Ошибка", "Ошибка (%)"])
+
+    for t in labels:
+        a = actual_dict.get(t)
+        f = forecast_dict.get(t)
+        diff = (a - f) if a is not None and f is not None else ""
+        percent = (abs(diff) / a * 100) if a and f else ""
+        ws.append([
+            t.strftime("%Y-%m-%d %H:%M:%S"),
+            a if a is not None else "",
+            f if f is not None else "",
+            diff if diff != "" else "",
+            round(percent, 2) if percent != "" else ""
+        ])
+
+    for col in ws.columns:
+        max_len = max(len(str(cell.value)) if cell.value is not None else 0 for cell in col)
+        ws.column_dimensions[get_column_letter(col[0].column)].width = max_len + 2
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    response = make_response(buffer.read())
+    response.headers["Content-Disposition"] = "attachment; filename=comparison.xlsx"
+    response.headers["Content-type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return response
+
+
 if __name__ == "__main__":
     app.run(debug=True, use_reloader=False)

@@ -55,6 +55,14 @@
     <button type="submit" class="button">📥 Скачать CSV</button>
   </form>
 
+  <form action="/compare_table/export_excel" method="get">
+    <input type="hidden" name="sensor_actual_id" value="{{ request.args.sensor_actual_id }}" />
+    <input type="hidden" name="sensor_forecast_id" value="{{ request.args.sensor_forecast_id }}" />
+    <input type="hidden" name="start_date" value="{{ request.args.start_date }}" />
+    <input type="hidden" name="end_date" value="{{ request.args.end_date }}" />
+    <button type="submit" class="button">📊 Скачать Excel</button>
+  </form>
+
   <form action="/compare" method="get">
     <input type="hidden" name="sensor_actual_id" value="{{ request.args.sensor_actual_id }}" />
     <input type="hidden" name="sensor_forecast_id" value="{{ request.args.sensor_forecast_id }}" />
