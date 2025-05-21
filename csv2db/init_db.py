@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, create_engine, UniqueConstraint, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
-from db_session import SessionLocal
+from db_session import engine
 
 
 Base = declarative_base()
@@ -35,7 +35,6 @@ class Measurement(Base):
 
 
 def init_db():
-    engine = create_engine('sqlite:///burnoe.db', echo=False)
     Base.metadata.create_all(engine)
     print("База данных и таблицы успешно созданы.")
 

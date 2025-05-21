@@ -1,15 +1,12 @@
-<!DOCTYPE html>
-<html>
+{% extends "base.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <title>Сенсоры</title>
-</head>
+{% block title %}Список сенсоров{% endblock %}
 
-<body>
-    <h1>Список сенсоров</h1>
+{% block content %}
+<h1>Список сенсоров</h1>
 
-    <table border="1">
+<div class="table-container">
+    <table class="table">
         <thead>
             <tr>
                 <th>ID</th>
@@ -29,8 +26,7 @@
             {% endfor %}
         </tbody>
     </table>
+</div>
 
-    <br><a href="/">← Назад</a>
-</body>
-
-</html>
+<a href="/" class="button">← Назад</a>
+{% endblock %}

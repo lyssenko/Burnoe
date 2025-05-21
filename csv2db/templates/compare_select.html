@@ -1,91 +1,60 @@
-<!DOCTYPE html>
-<html>
+{% extends "base.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <title>Выбор сенсоров для сравнения</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
+{% block title %}Выбор сенсоров для сравнения{% endblock %}
 
-        .form-section {
-            margin-bottom: 20px;
-        }
+{% block content %}
+<h1>Сравнение прогноза и фактических данных</h1>
 
-        .button {
-            padding: 10px 15px;
-            font-size: 16px;
-            cursor: pointer;
-            border: none;
-            border-radius: 5px;
-            background-color: #4CAF50;
-            color: white;
-        }
+<form method="get" action="/compare" class="form-section">
+    <label for="sensor_actual_id">Сенсор фактических измерений:</label>
+    <select name="sensor_actual_id" id="sensor_actual_id" required>
+        {% for sensor in sensors_actual %}
+        <option value="{{ sensor.sensor_id }}">{{ sensor.sensor_name }} ({{ sensor.sensor_type }})</option>
+        {% endfor %}
+    </select>
 
-        .button:hover {
-            background-color: #45a049;
-        }
-    </style>
-</head>
+    <br><br>
 
-<body>
-    <h1>Сравнение прогноза и фактических данных</h1>
+    <label for="sensor_forecast_id">Сенсор прогноза:</label>
+    <select name="sensor_forecast_id" id="sensor_forecast_id" required>
+        {% for sensor in sensors_forecast %}
+        <option value="{{ sensor.sensor_id }}">{{ sensor.sensor_name }} ({{ sensor.sensor_type }})</option>
+        {% endfor %}
+    </select>
 
-    <form method="get" action="/compare" class="form-section">
-        <label for="sensor_actual_id">Сенсор фактических измерений:</label>
-        <select name="sensor_actual_id" id="sensor_actual_id" required>
-            {% for sensor in sensors_actual %}
-            <option value="{{ sensor.sensor_id }}">{{ sensor.sensor_name }} ({{ sensor.sensor_type }})</option>
-            {% endfor %}
-        </select>
+    <br><br>
 
-        <br><br>
+    <label for="start_date">Начальная дата:</label>
+    <input type="date" name="start_date" id="start_date" required>
 
-        <label for="sensor_forecast_id">Сенсор прогноза:</label>
-        <select name="sensor_forecast_id" id="sensor_forecast_id" required>
-            {% for sensor in sensors_forecast %}
-            <option value="{{ sensor.sensor_id }}">{{ sensor.sensor_name }} ({{ sensor.sensor_type }})</option>
-            {% endfor %}
-        </select>
+    <label for="end_date">Конечная дата (опционально):</label>
+    <input type="date" name="end_date" id="end_date">
 
-        <br><br>
+    <br><br>
+    <input type="submit" value="Сравнить (график)" class="button">
+</form>
 
-        <label for="start_date">Начальная дата:</label>
-        <input type="date" name="start_date" id="start_date" required>
+<form method="get" action="/compare_table">
+    <input type="hidden" name="sensor_actual_id" id="hidden_sensor_actual">
+    <input type="hidden" name="sensor_forecast_id" id="hidden_sensor_forecast">
+    <input type="hidden" name="start_date" id="hidden_start_date">
+    <input type="hidden" name="end_date" id="hidden_end_date">
+    <input type="submit" value="Сравнить (таблица)" class="button">
+</form>
 
-        <label for="end_date">Конечная дата (опционально):</label>
-        <input type="date" name="end_date" id="end_date">
+<script>
+    function syncCompareParams() {
+        document.getElementById('hidden_sensor_actual').value = document.getElementById('sensor_actual_id').value;
+        document.getElementById('hidden_sensor_forecast').value = document.getElementById('sensor_forecast_id').value;
+        document.getElementById('hidden_start_date').value = document.getElementById('start_date').value;
+        document.getElementById('hidden_end_date').value = document.getElementById('end_date').value;
+    }
+    document.querySelectorAll('#sensor_actual_id, #sensor_forecast_id, #start_date, #end_date').forEach(el => {
+        el.addEventListener('change', syncCompareParams);
+    });
+    window.addEventListener('DOMContentLoaded', syncCompareParams);
+</script>
 
-        <br><br>
-        <input type="submit" value="Сравнить (график)" class="button">
-    </form>
-
-    <form method="get" action="/compare_table">
-        <input type="hidden" name="sensor_actual_id" id="hidden_sensor_actual">
-        <input type="hidden" name="sensor_forecast_id" id="hidden_sensor_forecast">
-        <input type="hidden" name="start_date" id="hidden_start_date">
-        <input type="hidden" name="end_date" id="hidden_end_date">
-        <input type="submit" value="Сравнить (таблица)" class="button">
-    </form>
-
-    <script>
-        function syncCompareParams() {
-            document.getElementById('hidden_sensor_actual').value = document.getElementById('sensor_actual_id').value;
-            document.getElementById('hidden_sensor_forecast').value = document.getElementById('sensor_forecast_id')
-                .value;
-            document.getElementById('hidden_start_date').value = document.getElementById('start_date').value;
-            document.getElementById('hidden_end_date').value = document.getElementById('end_date').value;
-        }
-        document.querySelectorAll('#sensor_actual_id, #sensor_forecast_id, #start_date, #end_date').forEach(el => {
-            el.addEventListener('change', syncCompareParams);
-        });
-        window.addEventListener('DOMContentLoaded', syncCompareParams);
-    </script>
-
-    <br>
-    <a href="/" class="button">← Назад</a>
-</body>
-
-</html>
+<br>
+<a href="/" class="button">← Назад</a>
+{% endblock %}
