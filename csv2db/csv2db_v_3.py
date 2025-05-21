@@ -9,8 +9,13 @@ from flask import Flask, request, render_template, redirect, url_for
 import pandas as pd
 from collections import defaultdict, namedtuple
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+import csv
+from flask import make_response
+import io
 
 from comparison_utils import (
+    get_common_time_series,
+    get_measurements,
     get_sensor_names,
     get_sensor_id,
     determine_sensor_type_and_unit,
@@ -239,7 +244,6 @@ def compare_select():
     db.close()
     return render_template('compare_select.html', sensors_actual=sensors_actual, sensors_forecast=sensors_forecast)
 
-
 @app.route('/compare', methods=['GET'])
 def compare():
     db = SessionLocal()
@@ -380,13 +384,48 @@ def compare_table():
             'percent': round(percent, 2) if percent is not None else ''
         })
 
+    total_actual = sum(row['actual'] for row in comparison_rows if row['actual'] not in ('', None))
+    total_forecast = sum(row['forecast'] for row in comparison_rows if row['forecast'] not in ('', None))
+
+
     return render_template(
         "compare_table.html",
         comparison_rows=comparison_rows,
         actual_name=actual_name,
-        forecast_name=forecast_name
+        forecast_name=forecast_name,
+        total_actual=total_actual,
+        total_forecast=total_forecast
     )
 
+@app.route("/compare_table/export")
+def export_compare_table():
+    db = SessionLocal()
+    actual_id = int(request.args.get("sensor_actual_id"))
+    forecast_id = int(request.args.get("sensor_forecast_id"))
+    start_date = datetime.strptime(request.args.get("start_date"), "%Y-%m-%d")
+    end_date = datetime.strptime(request.args.get("end_date"), "%Y-%m-%d") + timedelta(days=1)
+
+    actual_data = get_measurements(db, actual_id, start_date, end_date)
+    forecast_data = get_measurements(db, forecast_id, start_date, end_date)
+    labels, actual_dict, forecast_dict = get_common_time_series(actual_data, forecast_data)
+
+    # Буфер CSV в памяти
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["Время", "Факт", "Прогноз", "Ошибка", "Ошибка (%)"])
+
+    for t in labels:
+        a = actual_dict.get(t)
+        f = forecast_dict.get(t)
+        diff = (a - f) if a is not None and f is not None else ""
+        percent = (abs(diff) / a * 100) if a and f else ""
+        writer.writerow([t.strftime("%Y-%m-%d %H:%M:%S"), a, f, diff, percent])
+
+    # Отправляем CSV
+    response = make_response(buffer.getvalue())
+    response.headers["Content-Disposition"] = "attachment; filename=comparison.csv"
+    response.headers["Content-type"] = "text/csv"
+    return response
 
 if __name__ == '__main__':
     app.run(debug=True, use_reloader=False)

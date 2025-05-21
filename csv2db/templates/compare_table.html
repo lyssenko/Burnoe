@@ -5,22 +5,43 @@
     <meta charset="UTF-8">
     <title>Сравнение в таблице</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
         .button {
             padding: 10px 15px;
             font-size: 16px;
-            cursor: pointer;
+            text-decoration: none;
+            color: white;
+            background-color: #4CAF50;
             border: none;
             border-radius: 5px;
-            background-color: #4CAF50;
-            color: white;
-            text-decoration: none;
-            margin-right: 10px;
+            cursor: pointer;
+            display: inline-block;
         }
-        .button:hover { background-color: #45a049; }
+
+        .button:hover {
+            background-color: #45a049;
+        }
     </style>
 </head>
 
@@ -49,22 +70,30 @@
                 <td>{{ row.percent }}</td>
             </tr>
             {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-        <p>Нет данных для отображения.</p>
-    {% endif %}
+        <tfoot>
+            <tr>
+                <td><strong>Итого:</strong></td>
+                <td><strong>{{ total_actual }}</strong></td>
+                <td><strong>{{ total_forecast }}</strong></td>
+                <td></td>
+                <td></td>
+            </tr>
+        </tfoot </tbody> </table> {% else %} <p>Нет данных для отображения.</p>
+        {% endif %}
 
-    <br>
-    <form method="get" action="/compare">
-        <input type="hidden" name="sensor_actual_id" value="{{ request.args.get('sensor_actual_id') }}">
-        <input type="hidden" name="sensor_forecast_id" value="{{ request.args.get('sensor_forecast_id') }}">
-        <input type="hidden" name="start_date" value="{{ request.args.get('start_date') }}">
-        <input type="hidden" name="end_date" value="{{ request.args.get('end_date') }}">
-        <input type="submit" value="Перейти к графику" class="button">
-    </form>
+        <br>
+        <div style="margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px;">
+            <form action="/compare_table/export" method="get">
+                <input type="hidden" name="sensor_actual_id" value="{{ request.args.sensor_actual_id }}">
+                <input type="hidden" name="sensor_forecast_id" value="{{ request.args.sensor_forecast_id }}">
+                <input type="hidden" name="start_date" value="{{ request.args.start_date }}">
+                <input type="hidden" name="end_date" value="{{ request.args.end_date }}">
+                <button type="submit" class="button">📥 Скачать CSV</button>
+            </form>
 
-    <a href="/" class="button">← На главную</a>
-    <a href="/compare_select" class="button">🔙 К выбору сенсоров</a>
+            <a href="/" class="button">← На главную</a>
+            <a href="/compare_select" class="button">↩ К выбору сенсоров</a>
+        </div>
 </body>
+
 </html>

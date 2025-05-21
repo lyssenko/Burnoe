@@ -1,13 +1,16 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
 from collections import namedtuple
-from init_db import Sensor, Measurement
+from init_db import Sensor, Measurement, SessionLocal
 import logging
 from sqlalchemy import func
 import pandas as pd
 import os
-from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 import re
+from flask import request
+from sqlalchemy.exc import IntegrityError
+import numpy as np
 
 DataPoint = namedtuple("DataPoint", ["measurement_time", "value"])
 
@@ -29,7 +32,7 @@ def process_measurements(df, sensor_cols, sensor_map, db, filename, errors):
                 value = float(row[col])
                 sensor_id = sensor_map[col]
                 stmt = (
-                    insert(Measurement)
+                    np.insert(Measurement)
                     .values(sensor_id=sensor_id, measurement_time=dt, value=value)
                     .on_conflict_do_update(
                         index_elements=["sensor_id", "measurement_time"],
@@ -42,8 +45,10 @@ def process_measurements(df, sensor_cols, sensor_map, db, filename, errors):
                 errors.append(f"{filename}, строка {index+2}, столбец '{col}': {e}")
     return inserted
 
-
 def process_excel_energy_file(file, db, errors):
+    skipped_time = 0
+    skipped_value = 0
+    skipped_sensor = 0
     inserted = 0
     try:
         xl = pd.ExcelFile(file)
@@ -51,7 +56,19 @@ def process_excel_energy_file(file, db, errors):
         df.columns = [col.strip().split("\n")[0] for col in df.columns]
         df = df.dropna(subset=[df.columns[1]])
         df = df[~df[df.columns[1]].isin(["Сумма", "Среднее"])]
-        df[df.columns[1]] = pd.to_datetime(df[df.columns[1]], format="%d.%m.%Y %H:%M")
+
+        df[df.columns[1]] = pd.to_datetime(df[df.columns[1]], dayfirst=True, errors='coerce')
+        df = df.dropna(subset=[df.columns[1]])
+        df[df.columns[1]] = df[df.columns[1]].dt.floor("min")
+
+        # Применяем поправку ко времени
+        def correct_time(dt):
+            if pd.isna(dt):
+                return dt
+            return dt + timedelta(hours=5) if dt.date() < datetime(2024, 3, 1).date() else dt + timedelta(hours=4)
+
+        df[df.columns[1]] = df[df.columns[1]].apply(correct_time)
+
         melted = df.melt(
             id_vars=[df.columns[1]],
             value_vars=df.columns[2:],
@@ -59,8 +76,10 @@ def process_excel_energy_file(file, db, errors):
             value_name="value",
         )
         melted = melted.rename(columns={df.columns[1]: "measurement_time"})
-        melted = melted.dropna(subset=["value"])
-      
+        skipped_value = melted['value'].isna().sum()
+        skipped_time = melted['measurement_time'].isna().sum()
+        melted = melted.dropna(subset=["value", "measurement_time"])
+
         match = re.search(r"T-\d{1,2}", file.filename.upper())
         source_label = match.group(0) if match else "T-?"
 
@@ -80,8 +99,12 @@ def process_excel_energy_file(file, db, errors):
                     unit = ""
 
                 sensor_id = get_sensor_id(db, full_sensor_name, sensor_type, unit)
+                if pd.isna(sensor_id) or not isinstance(sensor_id, int):
+                    skipped_sensor += 1
+                    continue
+
                 stmt = (
-                    insert(Measurement)
+                    sqlite_insert(Measurement)
                     .values(
                         sensor_id=sensor_id,
                         measurement_time=row["measurement_time"],
@@ -89,17 +112,22 @@ def process_excel_energy_file(file, db, errors):
                     )
                     .on_conflict_do_update(
                         index_elements=["sensor_id", "measurement_time"],
-                        set_={"value": float(row["value"])},
+                        set_={"value": float(row["value"])}
                     )
                 )
+                print(f"Добавляется: {full_sensor_name}, {row['measurement_time']}, {row['value']}")
                 db.execute(stmt)
                 inserted += 1
             except Exception as e:
+                print(f"Ошибка строки: {e}")
                 errors.append(f"Ошибка в строке Excel: {e}")
+
+        print(f"Всего вставлено: {inserted}, пропущено по времени: {skipped_time}, по значению: {skipped_value}, по sensor_id: {skipped_sensor}")
+        total_value = melted['value'].sum()
+        print(f"Суммарное значение: {total_value}")
     except Exception as e:
         errors.append(f"Не удалось обработать Excel: {e}")
     return inserted
-
 
 def get_sensor_names(db, actual_id: int, forecast_id: int):
     try:
@@ -117,7 +145,6 @@ def get_sensor_names(db, actual_id: int, forecast_id: int):
         logger.error("Error in get_sensor_names: %s", e, exc_info=True)
         raise
 
-
 def determine_sensor_type_and_unit(col_name):
     lower = col_name.lower()
     if "irradiation" in lower or "pyranometer" in lower:
@@ -128,7 +155,6 @@ def determine_sensor_type_and_unit(col_name):
         return "temperature", "℃"
     else:
         return "unknown", "unknown"
-
 
 def get_measurements(db, sensor_id: int, start_dt=None, end_dt=None):
     try:
@@ -145,7 +171,6 @@ def get_measurements(db, sensor_id: int, start_dt=None, end_dt=None):
             "Error in get_measurements for sensor %s: %s", sensor_id, e, exc_info=True
         )
         raise
-
 
 def get_avg_measurements_for_all(db, start_dt, end_dt):
     Sensor = db.query_model("Sensor")
@@ -182,7 +207,6 @@ def get_avg_measurements_for_all(db, start_dt, end_dt):
             avg_data.append(DataPoint(t, avg))
     return avg_data
 
-
 def get_common_time_series(actual_data, forecast_data):
     all_times = sorted(
         set(
@@ -195,7 +219,6 @@ def get_common_time_series(actual_data, forecast_data):
 
     return all_times, actual_dict, forecast_dict
 
-
 def get_sensor_id(db, sensor_name, sensor_type, unit):
     sensor = db.query(Sensor).filter_by(sensor_name=sensor_name).first()
     if sensor:
@@ -204,7 +227,6 @@ def get_sensor_id(db, sensor_name, sensor_type, unit):
     db.add(new_sensor)
     db.flush()
     return new_sensor.sensor_id
-
 
 def compare_sensors(db, actual_id, forecast_id, start_dt, end_dt):
     actual_data = (

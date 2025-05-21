@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, create_engine, UniqueConstraint, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
+from db_session import SessionLocal
+
 
 Base = declarative_base()
 
