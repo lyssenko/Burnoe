@@ -183,7 +183,9 @@ def show_data():
             query = query.filter(Measurement.sensor_id == int(selected_sensor_id))
 
         start_dt, end_dt = parse_date_range(start_date, end_date)
-        measurements = query.order_by(Measurement.measurement_time.desc()).all()
+        query = query.filter(Measurement.measurement_time >= start_dt)
+        query = query.filter(Measurement.measurement_time <= end_dt)
+        measurements = query.order_by(Measurement.measurement_time).all()
         chart_labels = [
             m.measurement_time.strftime("%Y-%m-%d %H:%M:%S") for m in measurements
         ]
