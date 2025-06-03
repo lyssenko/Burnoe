@@ -7,42 +7,42 @@
 <h2>{{ actual_name }} vs {{ forecast_name }}</h2>
 
 {% if grouped_rows %}
-  {% for date, rows in grouped_rows.items() %}
-    <h3>{{ date }}</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>Час</th>
-          <th>Факт (Вт·ч/м²)</th>
-          <th>Прогноз</th>
-          <th>Ошибка</th>
-          <th>Ошибка (%)</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in rows %}
-        <tr>
-          <td>{{ row.time }}</td>
-          <td>{{ row.actual }}</td>
-          <td>{{ row.forecast }}</td>
-          <td>{{ row.error }}</td>
-          <td>{{ row.percent }}</td>
-        </tr>
-        {% endfor %}
-        {% set total = daily_totals | selectattr('date', 'equalto', date) | list | first %}
-        <tr>
-          <td><strong>Итого за {{ date }}</strong></td>
-          <td><strong>{{ total.actual }}</strong></td>
-          <td><strong>{{ total.forecast }}</strong></td>
-          <td></td>
-          <td></td>
-        </tr>
-      </tbody>
-    </table>
-    <br />
-  {% endfor %}
+{% for date, rows in grouped_rows.items() %}
+<h3>{{ date }}</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Час</th>
+      <th>Факт (Вт·ч/м²)</th>
+      <th>Прогноз</th>
+      <th>Ошибка</th>
+      <th>Ошибка (%)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td>{{ row.time }}</td>
+      <td>{{ row.actual }}</td>
+      <td>{{ row.forecast }}</td>
+      <td>{{ row.error }}</td>
+      <td>{{ row.percent }}</td>
+    </tr>
+    {% endfor %}
+    {% set total = daily_totals | selectattr('date', 'equalto', date) | list | first %}
+    <tr>
+      <td><strong>Итого за {{ date }}</strong></td>
+      <td><strong>{{ total.actual }}</strong></td>
+      <td><strong>{{ total.forecast }}</strong></td>
+      <td></td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+<br />
+{% endfor %}
 {% else %}
-  <p>Нет данных для отображения.</p>
+<p>Нет данных для отображения.</p>
 {% endif %}
 
 <br />
@@ -74,5 +74,27 @@
   <a href="/" class="button">← На главную</a>
   <a href="/compare_select" class="button">↩ К выбору сенсоров</a>
 </div>
-{% endblock %}
 
+{% if total_actual_sum is not none and total_forecast_sum is not none %}
+<h3>Итого за период</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Факт (Вт·ч/м²)</th>
+      <th>Прогноз</th>
+      <th>Ошибка</th>
+      <th>Ошибка (%)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>{{ total_actual_sum }}</strong></td>
+      <td><strong>{{ total_forecast_sum }}</strong></td>
+      <td><strong>{{ abs_error }}</strong></td>
+      <td><strong>{{ percent_error }}</strong></td>
+    </tr>
+  </tbody>
+</table>
+{% endif %}
+
+{% endblock %}

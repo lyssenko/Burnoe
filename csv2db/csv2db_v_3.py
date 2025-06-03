@@ -1,18 +1,20 @@
 import re
+import pandas as pd
+import csv
+import io
 from sqlite3 import IntegrityError
 from db_session import SessionLocal
 from init_db import Sensor, Measurement
 from datetime import datetime, timedelta
 from flask import Flask, request, render_template, redirect, url_for
-import pandas as pd
 from collections import defaultdict, namedtuple
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-import csv
 from flask import make_response
-import io
+from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
+
 
 from comparison_utils import (
-    get_avg_measurements_for_all,
     get_common_time_series,
     get_measurements,
     get_sensor_names,
@@ -269,8 +271,7 @@ def compare():
 
 @app.route("/compare_table", methods=["GET"])
 def compare_table():
-    from collections import defaultdict
-
+    
     with SessionLocal() as db:
         sensor_actual_id = request.args.get("sensor_actual_id")
         sensor_forecast_id = request.args.get("sensor_forecast_id")
@@ -307,6 +308,7 @@ def compare_table():
         forecast_name = db.get(Sensor, sensor_forecast_id).sensor_name
 
         if sensor_actual_id == -1:
+            from comparison_utils import get_avg_measurements_for_all
             actual_data = get_avg_measurements_for_all(db, start_dt, end_dt)
         else:
             actual_data = (
@@ -376,12 +378,29 @@ def compare_table():
             "forecast": round(forecast_sum, 3)
         })
 
+    total_actual_sum = sum(
+        row["actual"] for rows in grouped_rows.values() for row in rows
+        if isinstance(row["actual"], (int, float))
+    )
+    total_forecast_sum = sum(
+        row["forecast"] for rows in grouped_rows.values() for row in rows
+        if isinstance(row["forecast"], (int, float))
+    )
+
+    abs_error = total_actual_sum - total_forecast_sum
+    percent_error = (abs_error / total_actual_sum * 100) if total_actual_sum else None
+
+
     return render_template(
         "compare_table.html",
         grouped_rows=grouped_rows,
         daily_totals=daily_totals,
         actual_name=actual_name,
         forecast_name=forecast_name,
+        total_actual_sum=round(total_actual_sum, 3),
+        total_forecast_sum=round(total_forecast_sum, 3),
+        abs_error=round(abs_error, 3),
+        percent_error=round(percent_error, 2) if percent_error is not None else "",
     )
 
 
@@ -417,9 +436,6 @@ def export_compare_table():
     response.headers["Content-type"] = "text/csv"
     return response
 
-
-from openpyxl import Workbook
-from openpyxl.utils import get_column_letter
 
 @app.route("/compare_table/export_excel")
 def export_compare_table_excel():
