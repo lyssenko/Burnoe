@@ -4,16 +4,15 @@ import csv
 import io
 from sqlite3 import IntegrityError
 from db_session import SessionLocal
-from init_db import Sensor, Measurement
+from init_db import Sensor, Measurement, User
 from datetime import datetime, timedelta
 from flask import Flask, request, render_template, redirect, url_for
 from collections import defaultdict, namedtuple
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from flask import make_response
+from flask import session, flash, make_response
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
-
-
+from functools import wraps
 from comparison_utils import (
     get_common_time_series,
     get_measurements,
@@ -25,6 +24,40 @@ from comparison_utils import (
 
 app = Flask(__name__)
 
+app.secret_key = 'secret_key'
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in session:
+            flash('Необходимо войти в систему', 'warning')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        with SessionLocal() as db:
+            user = db.query(User).filter_by(username=username).first()
+            if user and user.check_password(password):
+                session['username'] = username
+                flash('Вы вошли в систему', 'success')
+                return redirect(url_for('index'))
+            else:
+                flash('Неверный логин или пароль', 'error')
+    return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    flash('Вы вышли из системы', 'info')
+    return redirect(url_for('index'))
+
 
 @app.route("/", methods=["GET"])
 def index():
@@ -32,6 +65,7 @@ def index():
 
 
 @app.route("/upload", methods=["POST"])
+@login_required
 def upload():
     files = request.files.getlist("dataFile")
     if not files:
@@ -66,6 +100,7 @@ def upload():
 
 
 @app.route("/upload_forecast", methods=["POST"])
+@login_required
 def upload_forecast():
     files = request.files.getlist("forecastFile")
     if not files:
@@ -160,6 +195,7 @@ def upload_forecast():
 
 
 @app.route("/sensors")
+@login_required
 def show_sensors():
     with SessionLocal() as db:
         sensors = db.query(Sensor).order_by(Sensor.sensor_id).all()
@@ -167,6 +203,7 @@ def show_sensors():
 
 
 @app.route("/data", methods=["GET", "POST"])
+@login_required
 def show_data():
     selected_sensor_id = request.args.get("sensor_id")
     start_date = request.args.get("start_date")
@@ -206,6 +243,7 @@ def show_data():
 
 
 @app.route("/compare_select", methods=["GET"])
+@login_required
 def compare_select():
     with SessionLocal() as db:
 
@@ -236,6 +274,7 @@ def compare_select():
 
 
 @app.route("/compare", methods=["GET"])
+@login_required
 def compare():
     with SessionLocal() as db:
 
@@ -270,6 +309,7 @@ def compare():
 
 
 @app.route("/compare_table", methods=["GET"])
+@login_required
 def compare_table():
     
     with SessionLocal() as db:
@@ -405,6 +445,7 @@ def compare_table():
 
 
 @app.route("/compare_table/export")
+@login_required
 def export_compare_table():
     db = SessionLocal()
     actual_id = int(request.args.get("sensor_actual_id"))
@@ -438,6 +479,7 @@ def export_compare_table():
 
 
 @app.route("/compare_table/export_excel")
+@login_required
 def export_compare_table_excel():
     db = SessionLocal()
     actual_id = int(request.args.get("sensor_actual_id"))

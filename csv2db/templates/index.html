@@ -29,3 +29,10 @@
 <a href="/data" class="button">📈 Посмотреть измерения</a>
 <a href="/compare_select" class="button">🔄 Сравнение факт-прогноз</a>
 {% endblock %}
+
+{% if session.get('username') %}
+  <p>Вы вошли как {{ session.get('username') }}</p>
+  <a href="/logout" class="button">Выйти</a>
+{% else %}
+  <a href="/login" class="button">Войти</a>
+{% endif %}
