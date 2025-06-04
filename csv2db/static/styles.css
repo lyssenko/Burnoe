@@ -1,6 +1,7 @@
 body {
     font-family: Arial, sans-serif;
-    margin: 20px;
+    max-width: 1200px;
+    margin: 20px auto;
 }
 
 h1,
@@ -66,9 +67,4 @@ th {
 
 canvas {
     margin-top: 30px;
-}
-
-body {
-    max-width: 1200px;
-    margin: 20px auto;
 }
