@@ -32,13 +32,17 @@ secret = os.getenv("SECRET_KEY")
 if not secret:
     raise RuntimeError("SECRET_KEY не найден в переменных окружения!")
 app.secret_key = secret
+app.permanent_session_lifetime = timedelta(minutes=10)
 
 
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'username' not in session:
-            flash('Необходимо войти в систему', 'warning')
+            if request.cookies.get(app.session_cookie_name):
+                flash('Ваша сессия истекла, войдите снова', 'warning')
+            else:
+                flash('Необходимо войти в систему', 'warning')
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -66,6 +70,7 @@ def login():
             user = db.query(User).filter_by(username=username).first()
             if user and user.check_password(password):
                 session['username'] = username
+                session.permanent = True
                 flash('Вы вошли в систему', 'success')
                 return redirect(url_for('index'))
             else:
@@ -219,7 +224,7 @@ def upload_forecast():
 @login_required
 def show_sensors():
     with SessionLocal() as db:
-        sensors = db.query(Sensor).order_by(Sensor.sensor_id).all()
+        sensors = db.query(Sensor).filter_by(visible=True).order_by(Sensor.sensor_id).all()
     return render_template("sensors.html", sensors=sensors)
 
 
@@ -236,7 +241,7 @@ def show_data():
         )
 
     with SessionLocal() as db:
-        sensors = db.query(Sensor).all()
+        sensors = db.query(Sensor).filter_by(visible=True).all()
         query = db.query(Measurement)
         if selected_sensor_id and selected_sensor_id.isdigit():
             query = query.filter(Measurement.sensor_id == int(selected_sensor_id))
@@ -268,17 +273,18 @@ def compare_select():
 
         sensors_actual = (
             db.query(Sensor)
-            .filter(~Sensor.sensor_name.ilike("%forecast%"))
+            .filter(~Sensor.sensor_name.ilike("%forecast%"), Sensor.visible == True)
             .order_by(Sensor.sensor_name)
             .all()
         )
 
         sensors_forecast = (
             db.query(Sensor)
-            .filter(Sensor.sensor_name.ilike("%forecast%"))
+            .filter(Sensor.sensor_name.ilike("%forecast%"), Sensor.visible == True)
             .order_by(Sensor.sensor_name)
             .all()
         )
+
 
         FakeSensor = namedtuple("FakeSensor", ["sensor_id", "sensor_name"])
         sensors_actual.append(
@@ -537,6 +543,23 @@ def export_compare_table_excel():
     response.headers["Content-Disposition"] = "attachment; filename=comparison.xlsx"
     response.headers["Content-type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     return response
+
+
+@app.route("/admin/sensors", methods=["GET", "POST"])
+@login_required
+def admin_sensors():
+    with SessionLocal() as db:
+        if request.method == "POST":
+            visible_ids = set(map(int, request.form.getlist("visible_sensor")))
+            all_sensors = db.query(Sensor).all()
+            for sensor in all_sensors:
+                sensor.visible = sensor.sensor_id in visible_ids
+            db.commit()
+            flash("Настройки видимости сохранены.", "success")
+            return redirect(url_for("admin_sensors"))
+
+        sensors = db.query(Sensor).order_by(Sensor.sensor_id).all()
+    return render_template("admin_sensors.html", sensors=sensors)
 
 
 if __name__ == "__main__":

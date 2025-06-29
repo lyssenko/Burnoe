@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from sqlalchemy import Boolean
 from db_session import SessionLocal, engine
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -9,12 +10,11 @@ Base = declarative_base()
 
 class Sensor(Base):
     __tablename__ = 'sensors'
-
     sensor_id = Column(Integer, primary_key=True, autoincrement=True)
     sensor_name = Column(String, nullable=False)
     sensor_type = Column(String, nullable=False)
     unit = Column(String, nullable=False)
-
+    visible = Column(Boolean, default=True) 
     measurements = relationship("Measurement", back_populates="sensor")
 
 class Measurement(Base):

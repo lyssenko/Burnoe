@@ -29,7 +29,9 @@
 <p>Для загрузки данных необходимо <a href="{{ url_for('login') }}">войти</a>.</p>
 {% endif %}
 
+{% if session.get('username') %}
 <a href="/sensors" class="button">📊 Посмотреть сенсоры</a>
+{% endif %}
 <a href="/data" class="button">📈 Посмотреть измерения</a>
 <a href="/compare_select" class="button">🔄 Сравнение факт-прогноз</a>
 {% endblock %}
