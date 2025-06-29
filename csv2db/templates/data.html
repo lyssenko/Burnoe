@@ -12,7 +12,7 @@
         {% for sensor in sensors %}
         <option value="{{ sensor.sensor_id }}"
             {% if sensor.sensor_id|string == selected_sensor_id %}selected{% endif %}>
-            {{ sensor.sensor_id }} - {{ sensor.sensor_name }}
+            {{ sensor.sensor_id }} - {{ sensor_label(sensor.sensor_name) }}
         </option>
         {% endfor %}
     </select>

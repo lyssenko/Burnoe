@@ -15,6 +15,7 @@ from flask import session, flash, make_response
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from functools import wraps
+from sensor_labels import SENSOR_LABELS, UNIT_LABELS
 from comparison_utils import (
     get_common_time_series,
     get_measurements,
@@ -42,9 +43,18 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+
 @app.context_processor
 def inject_user():
-    return dict(username=session.get('username'))
+    def sensor_label(name):
+        return SENSOR_LABELS.get(name, name)
+    def unit_label(unit):
+        return UNIT_LABELS.get(unit, unit)
+    return dict(
+        username=session.get('username'),
+        sensor_label=sensor_label,
+        unit_label=unit_label
+    )
 
 
 @app.route('/login', methods=['GET', 'POST'])
