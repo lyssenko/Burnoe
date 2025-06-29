@@ -2,6 +2,8 @@ import re
 import pandas as pd
 import csv
 import io
+import os
+from dotenv import load_dotenv
 from sqlite3 import IntegrityError
 from db_session import SessionLocal
 from init_db import Sensor, Measurement, User
@@ -22,9 +24,14 @@ from comparison_utils import (
     compare_sensors,
 )
 
-app = Flask(__name__)
 
-app.secret_key = 'secret_key'
+load_dotenv()
+app = Flask(__name__)
+secret = os.getenv("SECRET_KEY")
+if not secret:
+    raise RuntimeError("SECRET_KEY не найден в переменных окружения!")
+app.secret_key = secret
+
 
 def login_required(f):
     @wraps(f)
