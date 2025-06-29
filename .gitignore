@@ -6,6 +6,7 @@ __pycache__/
 *.pyd
 *.so
 csv2db/clear.py
+csv2db_v_3.zip
 
 # Virtual environment
 venv/
