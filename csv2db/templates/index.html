@@ -5,6 +5,7 @@
 {% block content %}
 <h1>Загрузка данных в базу данных</h1>
 
+{% if session.get('username') %}
 <div class="section">
   <h2>Измеренные данные</h2>
   <form action="/upload" method="post" enctype="multipart/form-data">
@@ -24,6 +25,9 @@
     <input type="submit" value="Загрузить прогноз" class="button">
   </form>
 </div>
+{% else %}
+<p>Для загрузки данных необходимо <a href="{{ url_for('login') }}">войти</a>.</p>
+{% endif %}
 
 <a href="/sensors" class="button">📊 Посмотреть сенсоры</a>
 <a href="/data" class="button">📈 Посмотреть измерения</a>

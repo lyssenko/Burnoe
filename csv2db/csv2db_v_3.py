@@ -42,6 +42,10 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+@app.context_processor
+def inject_user():
+    return dict(username=session.get('username'))
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -210,7 +214,6 @@ def show_sensors():
 
 
 @app.route("/data", methods=["GET", "POST"])
-@login_required
 def show_data():
     selected_sensor_id = request.args.get("sensor_id")
     start_date = request.args.get("start_date")
@@ -250,7 +253,6 @@ def show_data():
 
 
 @app.route("/compare_select", methods=["GET"])
-@login_required
 def compare_select():
     with SessionLocal() as db:
 
@@ -281,7 +283,6 @@ def compare_select():
 
 
 @app.route("/compare", methods=["GET"])
-@login_required
 def compare():
     with SessionLocal() as db:
 
@@ -316,7 +317,6 @@ def compare():
 
 
 @app.route("/compare_table", methods=["GET"])
-@login_required
 def compare_table():
     
     with SessionLocal() as db:
@@ -452,7 +452,6 @@ def compare_table():
 
 
 @app.route("/compare_table/export")
-@login_required
 def export_compare_table():
     db = SessionLocal()
     actual_id = int(request.args.get("sensor_actual_id"))
@@ -486,7 +485,6 @@ def export_compare_table():
 
 
 @app.route("/compare_table/export_excel")
-@login_required
 def export_compare_table_excel():
     db = SessionLocal()
     actual_id = int(request.args.get("sensor_actual_id"))
