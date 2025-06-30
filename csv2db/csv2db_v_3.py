@@ -23,6 +23,7 @@ from comparison_utils import (
     handle_uploaded_file,
     parse_date_range,
     compare_sensors,
+    group_measurements,
 )
 
 
@@ -38,13 +39,14 @@ app.permanent_session_lifetime = timedelta(minutes=10)
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'username' not in session:
+        if "username" not in session:
             if request.cookies.get(app.session_cookie_name):
-                flash('Ваша сессия истекла, войдите снова', 'warning')
+                flash("Ваша сессия истекла, войдите снова", "warning")
             else:
-                flash('Необходимо войти в систему', 'warning')
-            return redirect(url_for('login'))
+                flash("Необходимо войти в систему", "warning")
+            return redirect(url_for("login"))
         return f(*args, **kwargs)
+
     return decorated_function
 
 
@@ -52,37 +54,39 @@ def login_required(f):
 def inject_user():
     def sensor_label(name):
         return SENSOR_LABELS.get(name, name)
+
     def unit_label(unit):
         return UNIT_LABELS.get(unit, unit)
+
     return dict(
-        username=session.get('username'),
+        username=session.get("username"),
         sensor_label=sensor_label,
-        unit_label=unit_label
+        unit_label=unit_label,
     )
 
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route("/login", methods=["GET", "POST"])
 def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
         with SessionLocal() as db:
             user = db.query(User).filter_by(username=username).first()
             if user and user.check_password(password):
-                session['username'] = username
+                session["username"] = username
                 session.permanent = True
-                flash('Вы вошли в систему', 'success')
-                return redirect(url_for('index'))
+                flash("Вы вошли в систему", "success")
+                return redirect(url_for("index"))
             else:
-                flash('Неверный логин или пароль', 'error')
-    return render_template('login.html')
+                flash("Неверный логин или пароль", "error")
+    return render_template("login.html")
 
 
-@app.route('/logout')
+@app.route("/logout")
 def logout():
-    session.pop('username', None)
-    flash('Вы вышли из системы', 'info')
-    return redirect(url_for('index'))
+    session.pop("username", None)
+    flash("Вы вышли из системы", "info")
+    return redirect(url_for("index"))
 
 
 @app.route("/", methods=["GET"])
@@ -224,7 +228,9 @@ def upload_forecast():
 @login_required
 def show_sensors():
     with SessionLocal() as db:
-        sensors = db.query(Sensor).filter_by(visible=True).order_by(Sensor.sensor_id).all()
+        sensors = (
+            db.query(Sensor).filter_by(visible=True).order_by(Sensor.sensor_id).all()
+        )
     return render_template("sensors.html", sensors=sensors)
 
 
@@ -233,6 +239,8 @@ def show_data():
     selected_sensor_id = request.args.get("sensor_id")
     start_date = request.args.get("start_date")
     end_date = request.args.get("end_date")
+    interval = int(request.args.get("interval", 15))
+
     if not start_date and not end_date and not selected_sensor_id:
         default_start = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
         default_end = (datetime.now()).strftime("%Y-%m-%d")
@@ -250,10 +258,10 @@ def show_data():
         query = query.filter(Measurement.measurement_time >= start_dt)
         query = query.filter(Measurement.measurement_time <= end_dt)
         measurements = query.order_by(Measurement.measurement_time).all()
-        chart_labels = [
-            m.measurement_time.strftime("%Y-%m-%d %H:%M:%S") for m in measurements
-        ]
-        chart_values = [m.value for m in measurements]
+
+        grouped = group_measurements(measurements, interval)
+        chart_labels = [dt.strftime("%Y-%m-%d %H:%M") for dt in sorted(grouped)]
+        chart_values = [grouped[dt] for dt in sorted(grouped)]
 
     return render_template(
         "data.html",
@@ -264,6 +272,7 @@ def show_data():
         end_date=end_date,
         chart_labels=chart_labels,
         chart_values=chart_values,
+        interval=interval,
     )
 
 
@@ -285,7 +294,6 @@ def compare_select():
             .all()
         )
 
-
         FakeSensor = namedtuple("FakeSensor", ["sensor_id", "sensor_name"])
         sensors_actual.append(
             FakeSensor(sensor_id=-1, sensor_name="Среднее по всем фактическим")
@@ -301,12 +309,12 @@ def compare_select():
 @app.route("/compare", methods=["GET"])
 def compare():
     with SessionLocal() as db:
-
         try:
             actual_id = int(request.args.get("sensor_actual_id"))
             forecast_id = int(request.args.get("sensor_forecast_id"))
             start_date = request.args.get("start_date")
             end_date = request.args.get("end_date")
+            interval = int(request.args.get("interval", 15))
 
             start_dt = datetime.strptime(start_date, "%Y-%m-%d")
             end_dt = (
@@ -317,15 +325,27 @@ def compare():
 
             actual_name, forecast_name = get_sensor_names(db, actual_id, forecast_id)
 
-            result = compare_sensors(db, actual_id, forecast_id, start_dt, end_dt)
+            # Получаем сырые измерения
+            actual_data = get_measurements(db, actual_id, start_dt, end_dt)
+            forecast_data = get_measurements(db, forecast_id, start_dt, end_dt)
+
+            # Группируем по выбранному интервалу!
+            grouped_actual = group_measurements(actual_data, interval)
+            grouped_forecast = group_measurements(forecast_data, interval)
+
+            # Формируем общий список всех времен
+            all_times = sorted(set(grouped_actual.keys()).union(grouped_forecast.keys()))
+            actual_values = [grouped_actual.get(dt, None) for dt in all_times]
+            forecast_values = [grouped_forecast.get(dt, None) for dt in all_times]
 
             return render_template(
                 "compare.html",
-                chart_labels=[dt.strftime("%Y-%m-%d %H:%M:%S") for dt in result["labels"]],
-                actual_values=result["actual_values"],
-                forecast_values=result["forecast_values"],
+                chart_labels=[dt.strftime("%Y-%m-%d %H:%M") for dt in all_times],
+                actual_values=actual_values,
+                forecast_values=forecast_values,
                 actual_name=actual_name,
                 forecast_name=forecast_name,
+                interval=interval
             )
         except Exception as e:
             print(f"Ошибка в /compare: {e}")
@@ -334,12 +354,14 @@ def compare():
 
 @app.route("/compare_table", methods=["GET"])
 def compare_table():
-    
+    from collections import defaultdict
+
     with SessionLocal() as db:
         sensor_actual_id = request.args.get("sensor_actual_id")
         sensor_forecast_id = request.args.get("sensor_forecast_id")
         start_date = request.args.get("start_date")
         end_date = request.args.get("end_date")
+        interval = int(request.args.get("interval", 15))
 
         if not (sensor_actual_id and sensor_forecast_id and start_date):
             return redirect(url_for("compare_select"))
@@ -372,6 +394,7 @@ def compare_table():
 
         if sensor_actual_id == -1:
             from comparison_utils import get_avg_measurements_for_all
+
             actual_data = get_avg_measurements_for_all(db, start_dt, end_dt)
         else:
             actual_data = (
@@ -396,63 +419,76 @@ def compare_table():
             .all()
         )
 
-    actual_hourly = defaultdict(list)
-    forecast_hourly = defaultdict(list)
+    def bucket_time(dt, interval):
+        minute_bucket = (dt.minute // interval) * interval
+        return dt.replace(minute=minute_bucket, second=0, microsecond=0)
 
+    actual_buckets = defaultdict(list)
+    forecast_buckets = defaultdict(list)
     for m in actual_data:
-        hour = m.measurement_time.replace(minute=0, second=0, microsecond=0)
-        actual_hourly[hour].append(m.value)
-
+        b_time = bucket_time(m.measurement_time, interval)
+        actual_buckets[b_time].append(m.value)
     for m in forecast_data:
-        hour = m.measurement_time.replace(minute=0, second=0, microsecond=0)
-        forecast_hourly[hour].append(m.value)
+        b_time = bucket_time(m.measurement_time, interval)
+        forecast_buckets[b_time].append(m.value)
 
-    all_hours = sorted(set(actual_hourly.keys()).union(forecast_hourly.keys()))
+    all_buckets = sorted(set(actual_buckets.keys()) | set(forecast_buckets.keys()))
 
     grouped_rows = defaultdict(list)
     daily_totals = []
 
-    for hour in all_hours:
-        a_vals = [v if v is not None and v >= 0 else 0 for v in actual_hourly.get(hour, [])]
-        f_vals = [v if v is not None and v >= 0 else 0 for v in forecast_hourly.get(hour, [])]
-
-        a_sum = sum(a_vals) if a_vals else None
-        f_sum = sum(f_vals) if f_vals else None
-        err = a_sum - f_sum if a_sum is not None and f_sum is not None else None
-        percent = ((err / a_sum) * 100) if a_sum and err is not None else None
-
-        date_key = hour.strftime("%Y-%m-%d")
+    for b_time in all_buckets:
+        a_vals = actual_buckets.get(b_time, [])
+        f_vals = forecast_buckets.get(b_time, [])
+        a_avg = round(sum(a_vals) / len(a_vals), 3) if a_vals else ""
+        f_avg = round(sum(f_vals) / len(f_vals), 3) if f_vals else ""
+        err = (a_avg - f_avg) if (a_avg != "" and f_avg != "") else ""
+        percent = (
+            ((err / a_avg) * 100)
+            if (a_avg != "" and f_avg != "" and a_avg != 0)
+            else ""
+        )
+        date_key = b_time.strftime("%Y-%m-%d")
         row = {
             "date": date_key,
-            "time": hour.strftime("%Y-%m-%d %H:00"),
-            "actual": round(a_sum, 3) if a_sum is not None else "",
-            "forecast": round(f_sum, 3) if f_sum is not None else "",
-            "error": round(err, 3) if err is not None else "",
-            "percent": round(percent, 2) if percent is not None else "",
+            "time": b_time.strftime("%Y-%m-%d %H:%M"),
+            "actual": a_avg,
+            "forecast": f_avg,
+            "error": round(err, 3) if err != "" else "",
+            "percent": round(percent, 2) if percent != "" else "",
         }
         grouped_rows[date_key].append(row)
 
     for date, rows in grouped_rows.items():
-        actual_sum = sum(row["actual"] for row in rows if isinstance(row["actual"], (int, float)))
-        forecast_sum = sum(row["forecast"] for row in rows if isinstance(row["forecast"], (int, float)))
-        daily_totals.append({
-            "date": date,
-            "actual": round(actual_sum, 3),
-            "forecast": round(forecast_sum, 3)
-        })
+        actual_sum = sum(
+            row["actual"] for row in rows if isinstance(row["actual"], (int, float))
+        )
+        forecast_sum = sum(
+            row["forecast"] for row in rows if isinstance(row["forecast"], (int, float))
+        )
+        daily_totals.append(
+            {
+                "date": date,
+                "actual": round(actual_sum, 3),
+                "forecast": round(forecast_sum, 3),
+            }
+        )
 
     total_actual_sum = sum(
-        row["actual"] for rows in grouped_rows.values() for row in rows
+        row["actual"]
+        for rows in grouped_rows.values()
+        for row in rows
         if isinstance(row["actual"], (int, float))
     )
     total_forecast_sum = sum(
-        row["forecast"] for rows in grouped_rows.values() for row in rows
+        row["forecast"]
+        for rows in grouped_rows.values()
+        for row in rows
         if isinstance(row["forecast"], (int, float))
     )
 
     abs_error = total_actual_sum - total_forecast_sum
     percent_error = (abs_error / total_actual_sum * 100) if total_actual_sum else None
-
 
     return render_template(
         "compare_table.html",
@@ -464,6 +500,7 @@ def compare_table():
         total_forecast_sum=round(total_forecast_sum, 3),
         abs_error=round(abs_error, 3),
         percent_error=round(percent_error, 2) if percent_error is not None else "",
+        interval=interval
     )
 
 
@@ -506,11 +543,15 @@ def export_compare_table_excel():
     actual_id = int(request.args.get("sensor_actual_id"))
     forecast_id = int(request.args.get("sensor_forecast_id"))
     start_date = datetime.strptime(request.args.get("start_date"), "%Y-%m-%d")
-    end_date = datetime.strptime(request.args.get("end_date"), "%Y-%m-%d") + timedelta(days=1)
+    end_date = datetime.strptime(request.args.get("end_date"), "%Y-%m-%d") + timedelta(
+        days=1
+    )
 
     actual_data = get_measurements(db, actual_id, start_date, end_date)
     forecast_data = get_measurements(db, forecast_id, start_date, end_date)
-    labels, actual_dict, forecast_dict = get_common_time_series(actual_data, forecast_data)
+    labels, actual_dict, forecast_dict = get_common_time_series(
+        actual_data, forecast_data
+    )
 
     wb = Workbook()
     ws = wb.active
@@ -523,16 +564,20 @@ def export_compare_table_excel():
         f = forecast_dict.get(t)
         diff = (a - f) if a is not None and f is not None else ""
         percent = (abs(diff) / a * 100) if a and f else ""
-        ws.append([
-            t.strftime("%Y-%m-%d %H:%M:%S"),
-            a if a is not None else "",
-            f if f is not None else "",
-            diff if diff != "" else "",
-            round(percent, 2) if percent != "" else ""
-        ])
+        ws.append(
+            [
+                t.strftime("%Y-%m-%d %H:%M:%S"),
+                a if a is not None else "",
+                f if f is not None else "",
+                diff if diff != "" else "",
+                round(percent, 2) if percent != "" else "",
+            ]
+        )
 
     for col in ws.columns:
-        max_len = max(len(str(cell.value)) if cell.value is not None else 0 for cell in col)
+        max_len = max(
+            len(str(cell.value)) if cell.value is not None else 0 for cell in col
+        )
         ws.column_dimensions[get_column_letter(col[0].column)].width = max_len + 2
 
     buffer = io.BytesIO()
@@ -541,7 +586,9 @@ def export_compare_table_excel():
 
     response = make_response(buffer.read())
     response.headers["Content-Disposition"] = "attachment; filename=comparison.xlsx"
-    response.headers["Content-type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    response.headers["Content-type"] = (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
     return response
 
 

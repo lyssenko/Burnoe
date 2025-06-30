@@ -6,7 +6,7 @@
 <h1>Данные измерений</h1>
 
 <form method="get" action="/data" class="form-inline">
-    <label for="sensor">Фильтр по sensor_id:</label>
+    <label for="sensor">Фильтр по сенсорам:</label>
     <select name="sensor_id" id="sensor">
         <option value="">-- Все сенсоры --</option>
         {% for sensor in sensors %}
@@ -22,6 +22,13 @@
 
     <label for="end_date">Конечная дата:</label>
     <input type="date" name="end_date" id="end_date" value="{{ end_date[:10] if end_date }}">
+
+    <label for="interval">Интервал усреднения:</label>
+    <select name="interval" id="interval">
+        <option value="15" {% if interval|default(15)|int == 15 %}selected{% endif %}>15 минут</option>
+        <option value="30" {% if interval|default(15)|int == 30 %}selected{% endif %}>30 минут</option>
+        <option value="60" {% if interval|default(15)|int == 60 %}selected{% endif %}>1 час</option>
+    </select>
 
     <input type="submit" value="Применить фильтры" class="button">
 </form>
@@ -51,7 +58,9 @@
 </div>
 
 <canvas id="myChart" width="800" height="400"></canvas>
-<br><a href="/" class="button">← Назад</a>
+<br>
+<a href="/" class="button">← На главную</a>
+
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>

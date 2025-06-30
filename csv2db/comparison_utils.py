@@ -274,3 +274,13 @@ def get_avg_measurements_for_all(db, start_dt, end_dt):
                 'value': avg
             }))
     return avg_data
+
+def group_measurements(measurements, interval_minutes):
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    for m in measurements:
+        dt = m.measurement_time
+        minute_bucket = (dt.minute // interval_minutes) * interval_minutes
+        dt_group = dt.replace(minute=minute_bucket, second=0, microsecond=0)
+        grouped[dt_group].append(m.value)
+    return {dt: sum(vals) / len(vals) for dt, vals in grouped.items()}

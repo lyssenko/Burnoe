@@ -6,6 +6,20 @@
 <h1>Сравнение прогнозных и фактических данных (таблица)</h1>
 <h2>{{ actual_name }} vs {{ forecast_name }}</h2>
 
+<form method="get" action="/compare_table" style="margin-bottom: 1em;">
+  <input type="hidden" name="sensor_actual_id" value="{{ request.args.get('sensor_actual_id', '') }}">
+  <input type="hidden" name="sensor_forecast_id" value="{{ request.args.get('sensor_forecast_id', '') }}">
+  <input type="hidden" name="start_date" value="{{ request.args.get('start_date', '') }}">
+  <input type="hidden" name="end_date" value="{{ request.args.get('end_date', '') }}">
+  <label for="interval">Интервал усреднения:</label>
+  <select name="interval" id="interval" onchange="this.form.submit()">
+    <option value="15" {% if interval|int == 15 %}selected{% endif %}>15 минут</option>
+    <option value="30" {% if interval|int == 30 %}selected{% endif %}>30 минут</option>
+    <option value="60" {% if interval|int == 60 %}selected{% endif %}>1 час</option>
+  </select>
+  <noscript><input type="submit" value="Применить"></noscript>
+</form>
+
 {% if grouped_rows %}
 {% for date, rows in grouped_rows.items() %}
 <h3>{{ date }}</h3>
@@ -52,6 +66,7 @@
     <input type="hidden" name="sensor_forecast_id" value="{{ request.args.sensor_forecast_id }}" />
     <input type="hidden" name="start_date" value="{{ request.args.start_date }}" />
     <input type="hidden" name="end_date" value="{{ request.args.end_date }}" />
+    <input type="hidden" name="interval" value="{{ interval }}">
     <button type="submit" class="button">📥 Скачать CSV</button>
   </form>
 
@@ -60,6 +75,7 @@
     <input type="hidden" name="sensor_forecast_id" value="{{ request.args.sensor_forecast_id }}" />
     <input type="hidden" name="start_date" value="{{ request.args.start_date }}" />
     <input type="hidden" name="end_date" value="{{ request.args.end_date }}" />
+    <input type="hidden" name="interval" value="{{ interval }}">
     <button type="submit" class="button">📊 Скачать Excel</button>
   </form>
 
@@ -68,6 +84,7 @@
     <input type="hidden" name="sensor_forecast_id" value="{{ request.args.sensor_forecast_id }}" />
     <input type="hidden" name="start_date" value="{{ request.args.start_date }}" />
     <input type="hidden" name="end_date" value="{{ request.args.end_date }}" />
+    <input type="hidden" name="interval" value="{{ interval }}">
     <button type="submit" class="button">📊 Перейти к графику</button>
   </form>
 

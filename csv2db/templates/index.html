@@ -34,6 +34,9 @@
 {% endif %}
 <a href="/data" class="button">📈 Посмотреть измерения</a>
 <a href="/compare_select" class="button">🔄 Сравнение факт-прогноз</a>
+{% if session.get('username') %}
+<a href="/admin/sensors" class="button">⚙️ Админка сенсоров</a>
+{% endif %}
 {% endblock %}
 
 {% if session.get('username') %}

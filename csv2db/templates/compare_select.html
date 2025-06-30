@@ -9,27 +9,30 @@
     <label for="sensor_actual_id">Сенсор фактических измерений:</label>
     <select name="sensor_actual_id" id="sensor_actual_id" required>
         {% for sensor in sensors_actual %}
-        <option value="{{ sensor.sensor_id }}">{{ sensor_label(sensor.sensor_name) }} ({{ sensor.sensor_type }})</option>
+        <option value="{{ sensor.sensor_id }}">{{ sensor_label(sensor.sensor_name) }} ({{ sensor.sensor_type }})
+        </option>
         {% endfor %}
     </select>
-
     <br><br>
-
     <label for="sensor_forecast_id">Сенсор прогноза:</label>
     <select name="sensor_forecast_id" id="sensor_forecast_id" required>
         {% for sensor in sensors_forecast %}
-        <option value="{{ sensor.sensor_id }}">{{ sensor_label(sensor.sensor_name) }} ({{ sensor.sensor_type }})</option>
+        <option value="{{ sensor.sensor_id }}">{{ sensor_label(sensor.sensor_name) }} ({{ sensor.sensor_type }})
+        </option>
         {% endfor %}
     </select>
-
     <br><br>
-
     <label for="start_date">Начальная дата:</label>
     <input type="date" name="start_date" id="start_date" required>
-
     <label for="end_date">Конечная дата (опционально):</label>
     <input type="date" name="end_date" id="end_date">
 
+    <label for="interval">Интервал усреднения:</label>
+    <select name="interval" id="interval">
+        <option value="15" {% if interval|default(15)|int == 15 %}selected{% endif %}>15 минут</option>
+        <option value="30" {% if interval|default(15)|int == 30 %}selected{% endif %}>30 минут</option>
+        <option value="60" {% if interval|default(15)|int == 60 %}selected{% endif %}>1 час</option>
+    </select>
     <br><br>
     <input type="submit" value="Сравнить (график)" class="button">
 </form>
@@ -39,6 +42,7 @@
     <input type="hidden" name="sensor_forecast_id" id="hidden_sensor_forecast">
     <input type="hidden" name="start_date" id="hidden_start_date">
     <input type="hidden" name="end_date" id="hidden_end_date">
+    <input type="hidden" name="interval" id="hidden_interval">
     <input type="submit" value="Сравнить (таблица)" class="button">
 </form>
 
@@ -48,13 +52,16 @@
         document.getElementById('hidden_sensor_forecast').value = document.getElementById('sensor_forecast_id').value;
         document.getElementById('hidden_start_date').value = document.getElementById('start_date').value;
         document.getElementById('hidden_end_date').value = document.getElementById('end_date').value;
+        document.getElementById('hidden_interval').value = document.getElementById('interval').value;
     }
-    document.querySelectorAll('#sensor_actual_id, #sensor_forecast_id, #start_date, #end_date').forEach(el => {
+    document.querySelectorAll('#sensor_actual_id, #sensor_forecast_id, #start_date, #end_date, #interval').forEach(
+    el => {
         el.addEventListener('change', syncCompareParams);
     });
     window.addEventListener('DOMContentLoaded', syncCompareParams);
 </script>
 
 <br>
-<a href="/" class="button">← Назад</a>
+<a href="/" class="button">← На главную</a>
+
 {% endblock %}

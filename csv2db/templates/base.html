@@ -9,9 +9,6 @@
 
 <body>
     {% block content %}{% endblock %}
-    {% if session.get('username') %}
-    <a href="/admin/sensors" class="button">⚙️ Админка сенсоров</a>
-    {% endif %}
 </body>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
