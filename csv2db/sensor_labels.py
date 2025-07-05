@@ -1,8 +1,7 @@
 SENSOR_LABELS = {
     "Pyranometer.B1 St20": "Солнечная радиация (пирометр B1-St20 накл.)",
-    "Pyranometer.B2 St10": "Солнечная радиация (пирометр B2-St10 накл.)",
-    "Pyranometer.B1 St10": "Солнечная радиация (пирометр B2-St10 накл.)",
-    "Pyranometer.B1 St05": "Солнечная радиация (пирометр B2-St05 накл)",
+    "Pyranometer.B1 St10": "Солнечная радиация (пирометр B1-St10 накл.)",
+    "Pyranometer.B1 St05": "Солнечная радиация (пирометр B1-St05 накл)",
     "Forecast Radiation": "Солнечная радиация (прогноз)",
     "Forecast Energy": "Выработка энергии (прогноз)",
     "Meteo.Temp.02.temperature_module": "Температура модуля",
