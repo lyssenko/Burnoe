@@ -9,7 +9,7 @@ from db_session import SessionLocal
 from init_db import Sensor, Measurement, User
 from datetime import datetime, timedelta
 from flask import Flask, request, render_template, redirect, url_for
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from flask import session, flash, make_response
 from openpyxl import Workbook
@@ -22,7 +22,6 @@ from comparison_utils import (
     get_sensor_names,
     handle_uploaded_file,
     parse_date_range,
-    compare_sensors,
     group_measurements,
 )
 
@@ -325,15 +324,12 @@ def compare():
 
             actual_name, forecast_name = get_sensor_names(db, actual_id, forecast_id)
 
-            # Получаем сырые измерения
             actual_data = get_measurements(db, actual_id, start_dt, end_dt)
             forecast_data = get_measurements(db, forecast_id, start_dt, end_dt)
 
-            # Группируем по выбранному интервалу!
             grouped_actual = group_measurements(actual_data, interval)
             grouped_forecast = group_measurements(forecast_data, interval)
 
-            # Формируем общий список всех времен
             all_times = sorted(set(grouped_actual.keys()).union(grouped_forecast.keys()))
             actual_values = [grouped_actual.get(dt, None) for dt in all_times]
             forecast_values = [grouped_forecast.get(dt, None) for dt in all_times]
