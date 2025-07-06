@@ -1,13 +1,10 @@
 {% extends "base.html" %}
-
 {% block title %}Список сенсоров{% endblock %}
-
 {% block content %}
-<h1>Список сенсоров</h1>
-
-<div class="table-container">
-    <table class="table">
-        <thead>
+<h1 class="mb-4">Список сенсоров</h1>
+<div class="table-responsive">
+    <table class="table table-striped align-middle">
+        <thead class="table-light">
             <tr>
                 <th>ID</th>
                 <th>Название</th>
@@ -27,7 +24,5 @@
         </tbody>
     </table>
 </div>
-
-<a href="/" class="button">← На главную</a>
-
+<a href="/" class="btn btn-outline-secondary mt-3">← На главную</a>
 {% endblock %}

@@ -32,20 +32,20 @@ secret = os.getenv("SECRET_KEY")
 if not secret:
     raise RuntimeError("SECRET_KEY не найден в переменных окружения!")
 app.secret_key = secret
-app.permanent_session_lifetime = timedelta(minutes=10)
+app.permanent_session_lifetime = timedelta(minutes=1)
 
 
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        session_cookie_name = app.config.get("SESSION_COOKIE_NAME", "session")
         if "username" not in session:
-            if request.cookies.get(app.session_cookie_name):
+            if request.cookies.get(session_cookie_name):
                 flash("Ваша сессия истекла, войдите снова", "warning")
             else:
                 flash("Необходимо войти в систему", "warning")
             return redirect(url_for("login"))
         return f(*args, **kwargs)
-
     return decorated_function
 
 

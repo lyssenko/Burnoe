@@ -1,51 +1,57 @@
 {% extends "base.html" %}
-
 {% block title %}Выбор сенсоров для сравнения{% endblock %}
-
 {% block content %}
-<h1>Сравнение прогноза и фактических данных</h1>
-
-<form method="get" action="/compare" class="form-section">
-    <label for="sensor_actual_id">Сенсор фактических измерений:</label>
-    <select name="sensor_actual_id" id="sensor_actual_id" required>
-        {% for sensor in sensors_actual %}
-        <option value="{{ sensor.sensor_id }}">{{ sensor_label(sensor.sensor_name) }} ({{ sensor.sensor_type }})
-        </option>
-        {% endfor %}
-    </select>
-    <br><br>
-    <label for="sensor_forecast_id">Сенсор прогноза:</label>
-    <select name="sensor_forecast_id" id="sensor_forecast_id" required>
-        {% for sensor in sensors_forecast %}
-        <option value="{{ sensor.sensor_id }}">{{ sensor_label(sensor.sensor_name) }} ({{ sensor.sensor_type }})
-        </option>
-        {% endfor %}
-    </select>
-    <br><br>
-    <label for="start_date">Начальная дата:</label>
-    <input type="date" name="start_date" id="start_date" required>
-    <label for="end_date">Конечная дата (опционально):</label>
-    <input type="date" name="end_date" id="end_date">
-
-    <label for="interval">Интервал усреднения:</label>
-    <select name="interval" id="interval">
-        <option value="15" {% if interval|default(15)|int == 15 %}selected{% endif %}>15 минут</option>
-        <option value="30" {% if interval|default(15)|int == 30 %}selected{% endif %}>30 минут</option>
-        <option value="60" {% if interval|default(15)|int == 60 %}selected{% endif %}>1 час</option>
-    </select>
-    <br><br>
-    <input type="submit" value="Сравнить (график)" class="button">
+<h1 class="mb-4">Сравнение прогноза и фактических данных</h1>
+<form method="get" action="/compare" class="mb-4">
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label for="sensor_actual_id" class="form-label">Сенсор фактических измерений:</label>
+            <select name="sensor_actual_id" id="sensor_actual_id" class="form-select" required>
+                {% for sensor in sensors_actual %}
+                <option value="{{ sensor.sensor_id }}">{{ sensor_label(sensor.sensor_name) }} ({{ sensor.sensor_type }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label for="sensor_forecast_id" class="form-label">Сенсор прогноза:</label>
+            <select name="sensor_forecast_id" id="sensor_forecast_id" class="form-select" required>
+                {% for sensor in sensors_forecast %}
+                <option value="{{ sensor.sensor_id }}">{{ sensor_label(sensor.sensor_name) }} ({{ sensor.sensor_type }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label for="start_date" class="form-label">Начальная дата:</label>
+            <input type="date" name="start_date" id="start_date" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+            <label for="end_date" class="form-label">Конечная дата (опционально):</label>
+            <input type="date" name="end_date" id="end_date" class="form-control">
+        </div>
+        <div class="col-md-6">
+            <label for="interval" class="form-label">Интервал усреднения:</label>
+            <select name="interval" id="interval" class="form-select">
+                <option value="15" {% if interval|default(15)|int == 15 %}selected{% endif %}>15 минут</option>
+                <option value="30" {% if interval|default(15)|int == 30 %}selected{% endif %}>30 минут</option>
+                <option value="60" {% if interval|default(15)|int == 60 %}selected{% endif %}>1 час</option>
+            </select>
+        </div>
+    </div>
+    <div class="d-grid gap-2 mt-4">
+        <button type="submit" class="btn btn-success">Сравнить (график)</button>
+    </div>
 </form>
 
-<form method="get" action="/compare_table">
+<form method="get" action="/compare_table" class="mb-3">
     <input type="hidden" name="sensor_actual_id" id="hidden_sensor_actual">
     <input type="hidden" name="sensor_forecast_id" id="hidden_sensor_forecast">
     <input type="hidden" name="start_date" id="hidden_start_date">
     <input type="hidden" name="end_date" id="hidden_end_date">
     <input type="hidden" name="interval" id="hidden_interval">
-    <input type="submit" value="Сравнить (таблица)" class="button">
+    <button type="submit" class="btn btn-outline-primary">Сравнить (таблица)</button>
 </form>
-
 <script>
     function syncCompareParams() {
         document.getElementById('hidden_sensor_actual').value = document.getElementById('sensor_actual_id').value;
@@ -55,13 +61,10 @@
         document.getElementById('hidden_interval').value = document.getElementById('interval').value;
     }
     document.querySelectorAll('#sensor_actual_id, #sensor_forecast_id, #start_date, #end_date, #interval').forEach(
-    el => {
-        el.addEventListener('change', syncCompareParams);
-    });
+        el => {
+            el.addEventListener('change', syncCompareParams);
+        });
     window.addEventListener('DOMContentLoaded', syncCompareParams);
 </script>
-
-<br>
-<a href="/" class="button">← На главную</a>
-
+<a href="/" class="btn btn-outline-secondary mt-3">← На главную</a>
 {% endblock %}

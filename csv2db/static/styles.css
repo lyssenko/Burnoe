@@ -9,8 +9,10 @@ h2 {
     margin-bottom: 20px;
 }
 
+
+
 .button {
-    padding: 10px 15px;
+    padding: 10px 0px;
     font-size: 16px;
     cursor: pointer;
     border: none;
@@ -19,6 +21,7 @@ h2 {
     color: white;
     text-decoration: none;
     margin: 5px;
+    max-width: 100%;
 }
 
 .button:hover {
@@ -68,3 +71,21 @@ th {
 canvas {
     margin-top: 30px;
 }
+
+.login-form {
+    max-width: 340px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 30px 30px 15px 30px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+

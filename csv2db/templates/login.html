@@ -1,20 +1,27 @@
 {% extends "base.html" %}
-
 {% block title %}Вход{% endblock %}
-
 {% block content %}
-<h1>Вход</h1>
-<form method="post">
-    <label for="username">Логин:</label>
-    <input type="text" name="username" required>
-    <br><br>
-    <label for="password">Пароль:</label>
-    <input type="password" name="password" required>
-    <br><br>
-    <input type="submit" value="Войти" class="button">
-</form>
-
-<a href="/" class="button">← На главную</a>
-
-
+<div class="row justify-content-center">
+  <div class="col-md-5 col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h1 class="h4 mb-4 text-center">Вход</h1>
+        <form method="post">
+          <div class="mb-3">
+            <label for="username" class="form-label">Логин</label>
+            <input type="text" name="username" id="username" class="form-control" required autofocus>
+          </div>
+          <div class="mb-4">
+            <label for="password" class="form-label">Пароль</label>
+            <input type="password" name="password" id="password" class="form-control" required>
+          </div>
+          <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-success">Войти</button>
+            <a href="/" class="btn btn-outline-secondary">← На главную</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

@@ -1,14 +1,13 @@
 {% extends "base.html" %}
-
 {% block title %}Сравнение графика{% endblock %}
-
 {% block content %}
-<h1>График сравнения</h1>
-<h2>Сравнение: {{ actual_name }} vs {{ forecast_name }}</h2>
+<h1 class="mb-4">График сравнения</h1>
+<h2 class="mb-4">Сравнение: {{ actual_name }} vs {{ forecast_name }}</h2>
 
 {% if chart_labels %}
-<canvas id="comparisonChart" width="1000" height="400"></canvas>
-
+<div class="mb-4">
+  <canvas id="comparisonChart" width="1000" height="400"></canvas>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     const labels = {{ chart_labels | default([]) | tojson }};
@@ -63,17 +62,17 @@
 <p>Нет данных для отображения.</p>
 {% endif %}
 
-<br>
-<form method="get" action="/compare_table">
-    <input type="hidden" name="sensor_actual_id" value="{{ request.args.get('sensor_actual_id') }}">
-    <input type="hidden" name="sensor_forecast_id" value="{{ request.args.get('sensor_forecast_id') }}">
-    <input type="hidden" name="start_date" value="{{ request.args.get('start_date') }}">
-    <input type="hidden" name="end_date" value="{{ request.args.get('end_date') }}">
-    <input type="hidden" name="interval" value="{{ request.args.get('interval', 15) }}">
-    <input type="submit" value="Перейти к табличному сравнению" class="button">
-</form>
-
-<br>
-<a href="/compare_select" class="button">← Назад к выбору</a>
-<a href="/" class="button">← На главную</a>
+<div class="d-flex flex-wrap gap-2 my-4">
+  <form method="get" action="/compare_table" class="me-2">
+      <input type="hidden" name="sensor_actual_id" value="{{ request.args.get('sensor_actual_id') }}">
+      <input type="hidden" name="sensor_forecast_id" value="{{ request.args.get('sensor_forecast_id') }}">
+      <input type="hidden" name="start_date" value="{{ request.args.get('start_date') }}">
+      <input type="hidden" name="end_date" value="{{ request.args.get('end_date') }}">
+      <input type="hidden" name="interval" value="{{ request.args.get('interval', 15) }}">
+      <button type="submit" class="btn btn-primary">Перейти к табличному сравнению</button>
+  </form>
+  <a href="/compare_select" class="btn btn-outline-secondary">← Назад к выбору</a>
+  <a href="/" class="btn btn-outline-secondary">← На главную</a>
+</div>
 {% endblock %}
+

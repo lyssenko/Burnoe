@@ -1,47 +1,44 @@
 {% extends "base.html" %}
-
 {% block title %}Загрузка данных{% endblock %}
-
 {% block content %}
-<h1>Загрузка данных в базу данных</h1>
+<h1 class="mb-4">Загрузка данных в базу данных</h1>
 
 {% if session.get('username') %}
-<div class="section">
+<div class="mb-4">
   <h2>Измеренные данные</h2>
-  <form action="/upload" method="post" enctype="multipart/form-data">
-    <label for="dataFile">Выберите файлы с измерениями:</label>
-    <input type="file" name="dataFile" id="dataFile" accept=".csv" multiple>
-    <br><br>
-    <input type="submit" value="Загрузить измерения" class="button">
+  <form action="/upload" method="post" enctype="multipart/form-data" class="mb-3">
+    <label for="dataFile" class="form-label">Выберите файлы с измерениями:</label>
+    <input type="file" name="dataFile" id="dataFile" accept=".csv" multiple class="form-control mb-2">
+    <button type="submit" class="btn btn-success">Загрузить измерения</button>
   </form>
 </div>
 
-<div class="section">
+<div class="mb-4">
   <h2>Прогнозные данные</h2>
   <form action="/upload_forecast" method="post" enctype="multipart/form-data">
-    <label for="forecastFile">Выберите файлы с прогнозом радиации:</label>
-    <input type="file" name="forecastFile" id="forecastFile" accept=".csv" multiple>
-    <br><br>
-    <input type="submit" value="Загрузить прогноз" class="button">
+    <label for="forecastFile" class="form-label">Выберите файлы с прогнозом радиации:</label>
+    <input type="file" name="forecastFile" id="forecastFile" accept=".csv" multiple class="form-control mb-2">
+    <button type="submit" class="btn btn-success">Загрузить прогноз</button>
   </form>
 </div>
 {% else %}
 <p>Для загрузки данных необходимо <a href="{{ url_for('login') }}">войти</a>.</p>
 {% endif %}
 
-{% if session.get('username') %}
-<a href="/sensors" class="button">📊 Посмотреть сенсоры</a>
-{% endif %}
-<a href="/data" class="button">📈 Посмотреть измерения</a>
-<a href="/compare_select" class="button">🔄 Сравнение факт-прогноз</a>
-{% if session.get('username') %}
-<a href="/admin/sensors" class="button">⚙️ Админка сенсоров</a>
-{% endif %}
+<div class="d-flex flex-wrap gap-2 mt-3">
+  {% if session.get('username') %}
+  <a href="/sensors" class="btn btn-outline-primary">📊 Посмотреть сенсоры</a>
+  {% endif %}
+  <a href="/data" class="btn btn-outline-primary">📈 Посмотреть измерения</a>
+  <a href="/compare_select" class="btn btn-outline-primary">🔄 Сравнение факт-прогноз</a>
+  {% if session.get('username') %}
+  <a href="/admin/sensors" class="btn btn-outline-secondary">⚙️ Админка сенсоров</a>
+  {% endif %}
+  {% if session.get('username') %}
+  <a href="/logout" class="btn btn-danger ms-auto">Выйти</a>
+  <span class="align-self-center">Вы вошли как {{ session.get('username') }}</span>
+  {% else %}
+  <a href="/login" class="btn btn-success">Войти</a>
+  {% endif %}
+</div>
 {% endblock %}
-
-{% if session.get('username') %}
-<p>Вы вошли как {{ session.get('username') }}</p>
-<a href="/logout" class="button">Выйти</a>
-{% else %}
-<a href="/login" class="button">Войти</a>
-{% endif %}

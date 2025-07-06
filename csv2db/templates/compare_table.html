@@ -1,73 +1,71 @@
 {% extends "base.html" %}
-
 {% block title %}Сравнение в таблице{% endblock %}
-
 {% block content %}
-<h1>Сравнение прогнозных и фактических данных (таблица)</h1>
-<h2>{{ actual_name }} vs {{ forecast_name }}</h2>
+<h1 class="mb-4">Сравнение прогнозных и фактических данных (таблица)</h1>
+<h2 class="mb-4">{{ actual_name }} vs {{ forecast_name }}</h2>
 
-<form method="get" action="/compare_table" style="margin-bottom: 1em;">
+<form method="get" action="/compare_table" class="mb-3 d-flex align-items-center gap-2 flex-wrap">
   <input type="hidden" name="sensor_actual_id" value="{{ request.args.get('sensor_actual_id', '') }}">
   <input type="hidden" name="sensor_forecast_id" value="{{ request.args.get('sensor_forecast_id', '') }}">
   <input type="hidden" name="start_date" value="{{ request.args.get('start_date', '') }}">
   <input type="hidden" name="end_date" value="{{ request.args.get('end_date', '') }}">
-  <label for="interval">Интервал усреднения:</label>
-  <select name="interval" id="interval" onchange="this.form.submit()">
+  <label for="interval" class="form-label mb-0">Интервал усреднения:</label>
+  <select name="interval" id="interval" class="form-select w-auto" onchange="this.form.submit()">
     <option value="15" {% if interval|int == 15 %}selected{% endif %}>15 минут</option>
     <option value="30" {% if interval|int == 30 %}selected{% endif %}>30 минут</option>
     <option value="60" {% if interval|int == 60 %}selected{% endif %}>1 час</option>
   </select>
-  <noscript><input type="submit" value="Применить"></noscript>
+  <noscript><button type="submit" class="btn btn-secondary">Применить</button></noscript>
 </form>
 
 {% if grouped_rows %}
 {% for date, rows in grouped_rows.items() %}
-<h3>{{ date }}</h3>
-<table>
-  <thead>
-    <tr>
-      <th>Час</th>
-      <th>Факт (Вт·ч/м²)</th>
-      <th>Прогноз</th>
-      <th>Ошибка</th>
-      <th>Ошибка (%)</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for row in rows %}
-    <tr>
-      <td>{{ row.time }}</td>
-      <td>{{ row.actual }}</td>
-      <td>{{ row.forecast }}</td>
-      <td>{{ row.error }}</td>
-      <td>{{ row.percent }}</td>
-    </tr>
-    {% endfor %}
-    {% set total = daily_totals | selectattr('date', 'equalto', date) | list | first %}
-    <tr>
-      <td><strong>Итого за {{ date }}</strong></td>
-      <td><strong>{{ total.actual }}</strong></td>
-      <td><strong>{{ total.forecast }}</strong></td>
-      <td></td>
-      <td></td>
-    </tr>
-  </tbody>
-</table>
-<br />
+<h3 class="mt-4">{{ date }}</h3>
+<div class="table-responsive">
+  <table class="table table-striped align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Час</th>
+        <th>Факт (Вт·ч/м²)</th>
+        <th>Прогноз</th>
+        <th>Ошибка</th>
+        <th>Ошибка (%)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td>{{ row.time }}</td>
+        <td>{{ row.actual }}</td>
+        <td>{{ row.forecast }}</td>
+        <td>{{ row.error }}</td>
+        <td>{{ row.percent }}</td>
+      </tr>
+      {% endfor %}
+      {% set total = daily_totals | selectattr('date', 'equalto', date) | list | first %}
+      <tr class="table-secondary">
+        <td><strong>Итого за {{ date }}</strong></td>
+        <td><strong>{{ total.actual }}</strong></td>
+        <td><strong>{{ total.forecast }}</strong></td>
+        <td></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 {% endfor %}
 {% else %}
 <p>Нет данных для отображения.</p>
 {% endif %}
 
-<br />
-<div style="margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px">
+<div class="d-flex flex-wrap gap-2 mt-4">
   <form action="/compare_table/export" method="get">
     <input type="hidden" name="sensor_actual_id" value="{{ request.args.sensor_actual_id }}" />
     <input type="hidden" name="sensor_forecast_id" value="{{ request.args.sensor_forecast_id }}" />
     <input type="hidden" name="start_date" value="{{ request.args.start_date }}" />
     <input type="hidden" name="end_date" value="{{ request.args.end_date }}" />
     <input type="hidden" name="interval" value="{{ interval }}">
-    <button type="submit" class="button">📥 Скачать CSV</button>
+    <button type="submit" class="btn btn-outline-primary">📥 Скачать CSV</button>
   </form>
 
   <form action="/compare_table/export_excel" method="get">
@@ -76,7 +74,7 @@
     <input type="hidden" name="start_date" value="{{ request.args.start_date }}" />
     <input type="hidden" name="end_date" value="{{ request.args.end_date }}" />
     <input type="hidden" name="interval" value="{{ interval }}">
-    <button type="submit" class="button">📊 Скачать Excel</button>
+    <button type="submit" class="btn btn-outline-primary">📊 Скачать Excel</button>
   </form>
 
   <form action="/compare" method="get">
@@ -85,33 +83,34 @@
     <input type="hidden" name="start_date" value="{{ request.args.start_date }}" />
     <input type="hidden" name="end_date" value="{{ request.args.end_date }}" />
     <input type="hidden" name="interval" value="{{ interval }}">
-    <button type="submit" class="button">📊 Перейти к графику</button>
+    <button type="submit" class="btn btn-outline-success">📊 Перейти к графику</button>
   </form>
 
-  <a href="/" class="button">← На главную</a>
-  <a href="/compare_select" class="button">↩ К выбору сенсоров</a>
+  <a href="/" class="btn btn-outline-secondary">← На главную</a>
+  <a href="/compare_select" class="btn btn-outline-secondary">↩ К выбору сенсоров</a>
 </div>
 
 {% if total_actual_sum is not none and total_forecast_sum is not none %}
-<h3>Итого за период</h3>
-<table>
-  <thead>
-    <tr>
-      <th>Факт (Вт·ч/м²)</th>
-      <th>Прогноз</th>
-      <th>Ошибка</th>
-      <th>Ошибка (%)</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><strong>{{ total_actual_sum }}</strong></td>
-      <td><strong>{{ total_forecast_sum }}</strong></td>
-      <td><strong>{{ abs_error }}</strong></td>
-      <td><strong>{{ percent_error }}</strong></td>
-    </tr>
-  </tbody>
-</table>
+<h3 class="mt-4">Итого за период</h3>
+<div class="table-responsive">
+  <table class="table table-striped align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Факт (Вт·ч/м²)</th>
+        <th>Прогноз</th>
+        <th>Ошибка</th>
+        <th>Ошибка (%)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>{{ total_actual_sum }}</strong></td>
+        <td><strong>{{ total_forecast_sum }}</strong></td>
+        <td><strong>{{ abs_error }}</strong></td>
+        <td><strong>{{ percent_error }}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 {% endif %}
-
 {% endblock %}

@@ -1,39 +1,38 @@
 {% extends "base.html" %}
 {% block title %}Админка сенсоров{% endblock %}
-
 {% block content %}
-<h1>Управление видимостью сенсоров</h1>
+<h1 class="mb-4">Управление видимостью сенсоров</h1>
 <form method="post">
-    <div class="table-container">
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Название</th>
-                    <th>Тип</th>
-                    <th>Единица</th>
-                    <th>Видим</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for sensor in sensors %}
-                <tr>
-                    <td>{{ sensor.sensor_id }}</td>
-                    <td>{{ sensor_label(sensor.sensor_name) }}</td>
-                    <td>{{ sensor.sensor_type }}</td>
-                    <td>{{ unit_label(sensor.unit) }}</td>
-                    <td>
-                        <input type="checkbox" name="visible_sensor" value="{{ sensor.sensor_id }}"
-                            {% if sensor.visible %}checked{% endif %}>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    <br>
-    <input type="submit" value="Сохранить" class="button">
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>ID</th>
+          <th>Название</th>
+          <th>Тип</th>
+          <th>Единица</th>
+          <th>Видим</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sensor in sensors %}
+        <tr>
+          <td>{{ sensor.sensor_id }}</td>
+          <td>{{ sensor_label(sensor.sensor_name) }}</td>
+          <td>{{ sensor.sensor_type }}</td>
+          <td>{{ unit_label(sensor.unit) }}</td>
+          <td>
+            <input type="checkbox" name="visible_sensor" value="{{ sensor.sensor_id }}"
+              {% if sensor.visible %}checked{% endif %}>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="d-flex gap-2 mt-3">
+    <button type="submit" class="btn btn-success">Сохранить</button>
+    <a href="/" class="btn btn-outline-secondary">← На главную</a>
+  </div>
 </form>
-<br>
-<a href="/" class="button">← На главную</a>
 {% endblock %}

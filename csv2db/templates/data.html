@@ -1,42 +1,46 @@
 {% extends "base.html" %}
-
 {% block title %}Данные измерений{% endblock %}
-
 {% block content %}
-<h1>Данные измерений</h1>
-
-<form method="get" action="/data" class="form-inline">
-    <label for="sensor">Фильтр по сенсорам:</label>
-    <select name="sensor_id" id="sensor">
-        <option value="">-- Все сенсоры --</option>
-        {% for sensor in sensors %}
-        <option value="{{ sensor.sensor_id }}"
-            {% if sensor.sensor_id|string == selected_sensor_id %}selected{% endif %}>
-            {{ sensor.sensor_id }} - {{ sensor_label(sensor.sensor_name) }}
-        </option>
-        {% endfor %}
-    </select>
-
-    <label for="start_date">Начальная дата:</label>
-    <input type="date" name="start_date" id="start_date" value="{{ start_date[:10] if start_date }}">
-
-    <label for="end_date">Конечная дата:</label>
-    <input type="date" name="end_date" id="end_date" value="{{ end_date[:10] if end_date }}">
-
-    <label for="interval">Интервал усреднения:</label>
-    <select name="interval" id="interval">
-        <option value="15" {% if interval|default(15)|int == 15 %}selected{% endif %}>15 минут</option>
-        <option value="30" {% if interval|default(15)|int == 30 %}selected{% endif %}>30 минут</option>
-        <option value="60" {% if interval|default(15)|int == 60 %}selected{% endif %}>1 час</option>
-    </select>
-
-    <input type="submit" value="Применить фильтры" class="button">
+<h1 class="mb-4">Данные измерений</h1>
+<form method="get" action="/data" class="row row-cols-lg-auto g-3 align-items-center mb-4">
+    <div class="col-12">
+        <label for="sensor" class="form-label">Сенсор:</label>
+        <select name="sensor_id" id="sensor" class="form-select">
+            <option value="">-- Все сенсоры --</option>
+            {% for sensor in sensors %}
+            <option value="{{ sensor.sensor_id }}"
+                {% if sensor.sensor_id|string == selected_sensor_id %}selected{% endif %}>
+                {{ sensor.sensor_id }} - {{ sensor_label(sensor.sensor_name) }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-12">
+        <label for="start_date" class="form-label">Начальная дата:</label>
+        <input type="date" name="start_date" id="start_date" value="{{ start_date[:10] if start_date }}"
+            class="form-control">
+    </div>
+    <div class="col-12">
+        <label for="end_date" class="form-label">Конечная дата:</label>
+        <input type="date" name="end_date" id="end_date" value="{{ end_date[:10] if end_date }}" class="form-control">
+    </div>
+    <div class="col-12">
+        <label for="interval" class="form-label">Интервал:</label>
+        <select name="interval" id="interval" class="form-select">
+            <option value="15" {% if interval|default(15)|int == 15 %}selected{% endif %}>15 минут</option>
+            <option value="30" {% if interval|default(15)|int == 30 %}selected{% endif %}>30 минут</option>
+            <option value="60" {% if interval|default(15)|int == 60 %}selected{% endif %}>1 час</option>
+        </select>
+    </div>
+    <div class="col-12">
+        <button type="submit" class="btn btn-success">Применить фильтры</button>
+    </div>
 </form>
 
-<h2>Измерения</h2>
-<div class="table-container">
-    <table>
-        <thead>
+<h2 class="mb-3">Измерения</h2>
+<div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
+    <table class="table table-striped align-middle">
+        <thead class="table-light">
             <tr>
                 <th>ID</th>
                 <th>Sensor ID</th>
@@ -57,11 +61,10 @@
     </table>
 </div>
 
+
 <canvas id="myChart" width="800" height="400"></canvas>
 <br>
-<a href="/" class="button">← На главную</a>
-
-
+<a href="/" class="btn btn-outline-secondary mt-2">← На главную</a>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     const ctx = document.getElementById('myChart').getContext('2d');
