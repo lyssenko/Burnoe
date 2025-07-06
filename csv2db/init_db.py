@@ -1,9 +1,10 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, UniqueConstraint, Index
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import Boolean
 from db_session import SessionLocal, engine
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import text
 
 
 Base = declarative_base()
@@ -46,15 +47,16 @@ class User(Base):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
-
 def init_db():
     Base.metadata.create_all(engine)
     print("База данных и таблицы успешно созданы.")
 
-
 if __name__ == "__main__":
     init_db()
     with SessionLocal() as db:
+        result = db.execute(text("SELECT name FROM sqlite_master WHERE type='table';")).fetchall()
+        print("Найденные таблицы:", result)
+
         existing_user = db.query(User).filter_by(username="admin").first()
         if not existing_user:
             user = User(username="admin")
@@ -64,4 +66,26 @@ if __name__ == "__main__":
             print("Создан пользователь admin с паролем 12345")
         else:
             print("Пользователь admin уже существует")
+
+        virtual_sensors = [
+            {
+                "sensor_name": "Pyranometer.B1 AVG",
+                "sensor_type": "virtual",
+                "unit": "W/m2",
+                "visible": True,
+            },
+            {
+                "sensor_name": "Pyranometer.module.AVG",
+                "sensor_type": "virtual",
+                "unit": "W/m2",
+                "visible": True,
+            },
+        ]
+
+        for s in virtual_sensors:
+            exists = db.query(Sensor).filter_by(sensor_name=s["sensor_name"]).first()
+            if not exists:
+                db.add(Sensor(**s))
+                print(f"Добавлен виртуальный сенсор: {s['sensor_name']}")
+        db.commit()
 

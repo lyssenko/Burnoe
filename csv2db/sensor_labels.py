@@ -2,13 +2,16 @@ SENSOR_LABELS = {
     "Pyranometer.B1 St20": "Солнечная радиация (пирометр B1-St20 накл.)",
     "Pyranometer.B1 St10": "Солнечная радиация (пирометр B1-St10 накл.)",
     "Pyranometer.B1 St05": "Солнечная радиация (пирометр B1-St05 накл)",
+    "Pyranometer.module.08": "Солнечная радиация (пирометр 08 гор.)",
+    "Pyranometer.module.02": "Солнечная радиация (пирометр 02 гор.)",
+    "Pyranometer.B1 AVG": "Солнечная радиация (пирометр B1 AVG)",
+    "Pyranometer.module.AVG": "Солнечная радиация (пирометр module AVG)",
     "Forecast Radiation": "Солнечная радиация (прогноз)",
     "Forecast Energy": "Выработка энергии (прогноз)",
     "Meteo.Temp.02.temperature_module": "Температура модуля",
     "Meteo.Temp.02.temperature_ambient": "Температура окружающей среды",
     "Wind_Sensor.01.Wind speed": "Скорость ветра",
-    "Pyranometer.module.08": "Солнечная радиация (пирометр 08 гор.)",
-    "Pyranometer.module.02": "Солнечная радиация (пирометр 02 гор.)",
+   
 }
 
 UNIT_LABELS = {
@@ -18,4 +21,13 @@ UNIT_LABELS = {
     "": "—",
     "m/s": "м/с",
     "kvarh": "кВА·ч",
+}
+
+VIRTUAL_SENSOR_GROUPS = {
+    "Pyranometer.B1 AVG": [
+        "Pyranometer.B1 St20",
+        "Pyranometer.B1 St05",
+        "Pyranometer.B1 St10",
+    ],
+    "Pyranometer.module.AVG": ["Pyranometer.module.08", "Pyranometer.module.02"],
 }

@@ -9,7 +9,6 @@ from db_session import SessionLocal
 from init_db import Sensor, Measurement, User
 from datetime import datetime, timedelta
 from flask import Flask, request, render_template, redirect, url_for
-from collections import namedtuple
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from flask import session, flash, make_response
 from openpyxl import Workbook
@@ -23,6 +22,7 @@ from comparison_utils import (
     handle_uploaded_file,
     parse_date_range,
     group_measurements,
+    save_virtual_averages,
 )
 
 
@@ -110,20 +110,21 @@ def upload():
                 except Exception as e:
                     errors.append(f"Ошибка обработки {file.filename}: {e}")
 
+        if errors:
+            db.rollback()
+            msg = (
+                f"Загружено {total_inserted} измерений, но возникли ошибки:\n"
+                + "\n".join(errors[:10])
+            )
+            if len(errors) > 10:
+                msg += f"\n... и ещё {len(errors) - 10} ошибок скрыто."
+            return msg, 400
+
         try:
-            db.commit()
+            save_virtual_averages(db)
         except Exception as e:
             db.rollback()
-            return f"Ошибка при сохранении данных: {e}", 500
-
-    if errors:
-        msg = (
-            f"Загружено {total_inserted} измерений, но возникли ошибки:\n"
-            + "\n".join(errors[:10])
-        )
-        if len(errors) > 10:
-            msg += f"\n... и ещё {len(errors) - 10} ошибок скрыто."
-        return msg, 400
+            return f"Ошибка при расчёте средних значений: {e}", 500
 
     return f"Данные успешно загружены. Всего записей: {total_inserted}."
 
@@ -293,11 +294,6 @@ def compare_select():
             .all()
         )
 
-        FakeSensor = namedtuple("FakeSensor", ["sensor_id", "sensor_name"])
-        sensors_actual.append(
-            FakeSensor(sensor_id=-1, sensor_name="Среднее по всем фактическим")
-        )
-
     return render_template(
         "compare_select.html",
         sensors_actual=sensors_actual,
@@ -330,7 +326,9 @@ def compare():
             grouped_actual = group_measurements(actual_data, interval)
             grouped_forecast = group_measurements(forecast_data, interval)
 
-            all_times = sorted(set(grouped_actual.keys()).union(grouped_forecast.keys()))
+            all_times = sorted(
+                set(grouped_actual.keys()).union(grouped_forecast.keys())
+            )
             actual_values = [grouped_actual.get(dt, None) for dt in all_times]
             forecast_values = [grouped_forecast.get(dt, None) for dt in all_times]
 
@@ -341,7 +339,7 @@ def compare():
                 forecast_values=forecast_values,
                 actual_name=actual_name,
                 forecast_name=forecast_name,
-                interval=interval
+                interval=interval,
             )
         except Exception as e:
             print(f"Ошибка в /compare: {e}")
@@ -496,7 +494,7 @@ def compare_table():
         total_forecast_sum=round(total_forecast_sum, 3),
         abs_error=round(abs_error, 3),
         percent_error=round(percent_error, 2) if percent_error is not None else "",
-        interval=interval
+        interval=interval,
     )
 
 

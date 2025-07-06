@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from collections import namedtuple
 from init_db import Sensor, Measurement
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sensor_labels import VIRTUAL_SENSOR_GROUPS
 
 
 DataPoint = namedtuple("DataPoint", ["measurement_time", "value"])
@@ -277,10 +278,61 @@ def get_avg_measurements_for_all(db, start_dt, end_dt):
 
 def group_measurements(measurements, interval_minutes):
     from collections import defaultdict
+
     grouped = defaultdict(list)
     for m in measurements:
         dt = m.measurement_time
-        minute_bucket = (dt.minute // interval_minutes) * interval_minutes
-        dt_group = dt.replace(minute=minute_bucket, second=0, microsecond=0)
-        grouped[dt_group].append(m.value)
-    return {dt: sum(vals) / len(vals) for dt, vals in grouped.items()}
+        if m.value is not None:
+            minute_bucket = (dt.minute // interval_minutes) * interval_minutes
+            dt_group = dt.replace(minute=minute_bucket, second=0, microsecond=0)
+            grouped[dt_group].append(m.value)
+
+    return {dt: sum(vals) / len(vals) for dt, vals in grouped.items() if vals}
+
+def save_virtual_averages(db):
+    for virtual_name, source_names in VIRTUAL_SENSOR_GROUPS.items():
+        virtual_sensor = db.query(Sensor).filter_by(sensor_name=virtual_name).first()
+        if not virtual_sensor:
+            print(f"Виртуальный сенсор {virtual_name} не найден.")
+            continue
+
+        sensors = db.query(Sensor).filter(Sensor.sensor_name.in_(source_names)).all()
+        sensor_ids = [s.sensor_id for s in sensors if s]
+        if len(sensor_ids) != len(source_names):
+            print(f"Не все сенсоры группы найдены для {virtual_name}")
+            continue
+
+        rows = db.query(Measurement.measurement_time, Measurement.value, Measurement.sensor_id)\
+            .filter(Measurement.sensor_id.in_(sensor_ids))\
+            .all()
+        if not rows:
+            print(f"Нет данных для расчёта {virtual_name}")
+            continue
+
+        import pandas as pd
+        df = pd.DataFrame(rows, columns=["time", "value", "sensor_id"])
+        df = df.dropna()
+        if df.empty:
+            continue
+
+        df["time"] = pd.to_datetime(df["time"])
+        avg_df = df.groupby("time")["value"].mean().reset_index()
+        avg_df["value"] = avg_df["value"].round(2)
+        
+        for _, row in avg_df.iterrows():
+            stmt = (
+                sqlite_insert(Measurement)
+                .values(
+                    sensor_id=virtual_sensor.sensor_id,
+                    measurement_time=row["time"],
+                    value=row["value"]
+                )
+                .on_conflict_do_update(
+                    index_elements=["sensor_id", "measurement_time"],
+                    set_={"value": row["value"]}
+                )
+            )
+            db.execute(stmt)
+
+    db.commit()
+    print("Средние значения для виртуальных сенсоров успешно сохранены.")
