@@ -130,14 +130,17 @@ def get_sensor_names(db, actual_id: int, forecast_id: int):
     try:
         if actual_id == -1:
             actual_name = "Среднее"
+            actual_unit = "W/m2"
         else:
             sensor = db.query(Sensor).get(actual_id)
             actual_name = sensor.sensor_name if sensor else None
+            actual_unit = sensor.unit if sensor else ""
 
         forecast = db.query(Sensor).get(forecast_id)
         forecast_name = forecast.sensor_name if forecast else None
+        forecast_unit = forecast.unit if forecast else ""
 
-        return actual_name, forecast_name
+        return actual_name, forecast_name, actual_unit, forecast_unit
     except Exception as e:
         logger.error("Error in get_sensor_names: %s", e, exc_info=True)
         raise

@@ -2,6 +2,20 @@
 {% block title %}Выбор сенсоров для сравнения{% endblock %}
 {% block content %}
 <h1 class="mb-4">Сравнение прогноза и фактических данных</h1>
+
+<form method="get" action="/compare_select" class="mb-4">
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label for="data_type" class="form-label">Тип данных:</label>
+            <select name="data_type" id="data_type" class="form-select" onchange="this.form.submit()">
+                <option value="radiation" {% if data_type == 'radiation' %}selected{% endif %}>Радиация</option>
+                <option value="energy_active" {% if data_type == 'energy_active' %}selected{% endif %}>Энергия
+                    (активная)</option>
+            </select>
+        </div>
+    </div>
+</form>
+
 <form method="get" action="/compare" class="mb-4">
     <div class="row g-3">
         <div class="col-md-6">
@@ -24,11 +38,13 @@
         </div>
         <div class="col-md-6">
             <label for="start_date" class="form-label">Начальная дата:</label>
-            <input type="date" name="start_date" id="start_date" class="form-control" required>
+            <input type="date" name="start_date" id="start_date" class="form-control" required
+                value="{{ request.args.get('start_date', default_start) }}">
         </div>
         <div class="col-md-6">
             <label for="end_date" class="form-label">Конечная дата (опционально):</label>
-            <input type="date" name="end_date" id="end_date" class="form-control">
+            <input type="date" name="end_date" id="end_date" class="form-control"
+                value="{{ request.args.get('end_date', default_end) }}">
         </div>
         <div class="col-md-6">
             <label for="interval" class="form-label">Интервал усреднения:</label>
@@ -38,6 +54,7 @@
                 <option value="60" {% if interval|default(15)|int == 60 %}selected{% endif %}>1 час</option>
             </select>
         </div>
+        <input type="hidden" name="data_type" value="{{ data_type }}">
     </div>
     <div class="d-grid gap-2 mt-4">
         <button type="submit" class="btn btn-success">Сравнить (график)</button>
@@ -50,8 +67,10 @@
     <input type="hidden" name="start_date" id="hidden_start_date">
     <input type="hidden" name="end_date" id="hidden_end_date">
     <input type="hidden" name="interval" id="hidden_interval">
+    <input type="hidden" name="data_type" id="hidden_data_type">
     <button type="submit" class="btn btn-outline-primary">Сравнить (таблица)</button>
 </form>
+
 <script>
     function syncCompareParams() {
         document.getElementById('hidden_sensor_actual').value = document.getElementById('sensor_actual_id').value;
@@ -59,6 +78,7 @@
         document.getElementById('hidden_start_date').value = document.getElementById('start_date').value;
         document.getElementById('hidden_end_date').value = document.getElementById('end_date').value;
         document.getElementById('hidden_interval').value = document.getElementById('interval').value;
+        document.getElementById('hidden_data_type').value = document.getElementById('data_type').value;
     }
     document.querySelectorAll('#sensor_actual_id, #sensor_forecast_id, #start_date, #end_date, #interval').forEach(
         el => {
@@ -66,5 +86,6 @@
         });
     window.addEventListener('DOMContentLoaded', syncCompareParams);
 </script>
+
 <a href="/" class="btn btn-outline-secondary mt-3">← На главную</a>
 {% endblock %}

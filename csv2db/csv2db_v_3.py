@@ -278,18 +278,36 @@ def show_data():
 
 @app.route("/compare_select", methods=["GET"])
 def compare_select():
+    data_type = request.args.get("data_type", "radiation")
+
+    from datetime import date, timedelta
+
+    default_start = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+    default_end = date.today().strftime("%Y-%m-%d")
+
     with SessionLocal() as db:
+        actual_type_filter = (
+            [data_type, "virtual"] if data_type == "radiation" else [data_type]
+        )
 
         sensors_actual = (
             db.query(Sensor)
-            .filter(~Sensor.sensor_name.ilike("%forecast%"), Sensor.visible == True)
+            .filter(
+                ~Sensor.sensor_name.ilike("%forecast%"),
+                Sensor.visible == True,
+                Sensor.sensor_type.in_(actual_type_filter)
+            )
             .order_by(Sensor.sensor_name)
             .all()
         )
 
         sensors_forecast = (
             db.query(Sensor)
-            .filter(Sensor.sensor_name.ilike("%forecast%"), Sensor.visible == True)
+            .filter(
+                Sensor.sensor_name.ilike("%forecast%"),
+                Sensor.visible == True,
+                Sensor.sensor_type == data_type
+            )
             .order_by(Sensor.sensor_name)
             .all()
         )
@@ -298,6 +316,9 @@ def compare_select():
         "compare_select.html",
         sensors_actual=sensors_actual,
         sensors_forecast=sensors_forecast,
+        data_type=data_type,
+        default_start=default_start,
+        default_end=default_end,
     )
 
 
@@ -318,7 +339,7 @@ def compare():
                 else start_dt + timedelta(days=1)
             )
 
-            actual_name, forecast_name = get_sensor_names(db, actual_id, forecast_id)
+            actual_name, forecast_name, actual_unit, forecast_unit = get_sensor_names(db, actual_id, forecast_id)
 
             actual_data = get_measurements(db, actual_id, start_dt, end_dt)
             forecast_data = get_measurements(db, forecast_id, start_dt, end_dt)
@@ -340,6 +361,8 @@ def compare():
                 actual_name=actual_name,
                 forecast_name=forecast_name,
                 interval=interval,
+                actual_unit=actual_unit,
+                forecast_unit=forecast_unit,
             )
         except Exception as e:
             print(f"Ошибка в /compare: {e}")
@@ -384,7 +407,11 @@ def compare_table():
             if sensor_actual_id == -1
             else db.get(Sensor, sensor_actual_id).sensor_name
         )
-        forecast_name = db.get(Sensor, sensor_forecast_id).sensor_name
+        
+        from comparison_utils import get_sensor_names
+        actual_name, forecast_name, actual_unit, forecast_unit = get_sensor_names(
+            db, sensor_actual_id, sensor_forecast_id
+        )
 
         if sensor_actual_id == -1:
             from comparison_utils import get_avg_measurements_for_all
@@ -434,8 +461,12 @@ def compare_table():
     for b_time in all_buckets:
         a_vals = actual_buckets.get(b_time, [])
         f_vals = forecast_buckets.get(b_time, [])
+
         a_avg = round(sum(a_vals) / len(a_vals), 3) if a_vals else ""
         f_avg = round(sum(f_vals) / len(f_vals), 3) if f_vals else ""
+
+        a_avg = a_avg if isinstance(a_avg, (int, float)) and a_avg > 0 else 0
+        f_avg = f_avg if isinstance(f_avg, (int, float)) and f_avg > 0 else 0
         err = (a_avg - f_avg) if (a_avg != "" and f_avg != "") else ""
         percent = (
             ((err / a_avg) * 100)
@@ -453,20 +484,27 @@ def compare_table():
         }
         grouped_rows[date_key].append(row)
 
+    daily_totals_dict = {}
     for date, rows in grouped_rows.items():
         actual_sum = sum(
-            row["actual"] for row in rows if isinstance(row["actual"], (int, float))
+            float(row["actual"]) for row in rows if row["actual"] not in ("", None)
         )
         forecast_sum = sum(
-            row["forecast"] for row in rows if isinstance(row["forecast"], (int, float))
+            float(row["forecast"]) for row in rows if row["forecast"] not in ("", None)
         )
-        daily_totals.append(
-            {
-                "date": date,
-                "actual": round(actual_sum, 3),
-                "forecast": round(forecast_sum, 3),
-            }
-        )
+        abs_error = actual_sum - forecast_sum
+        percent_error = (abs_error / actual_sum * 100) if actual_sum else 0.0
+
+        daily_totals_dict[date] = {
+            "date": date,
+            "actual": round(actual_sum, 3),
+            "forecast": round(forecast_sum, 3),
+            "abs_error": round(abs_error, 3),
+            "percent_error": round(percent_error, 2)
+        }
+
+    daily_totals = list(daily_totals_dict.values())
+
 
     total_actual_sum = sum(
         row["actual"]
@@ -495,6 +533,8 @@ def compare_table():
         abs_error=round(abs_error, 3),
         percent_error=round(percent_error, 2) if percent_error is not None else "",
         interval=interval,
+        actual_unit=actual_unit,
+        forecast_unit=forecast_unit,
     )
 
 

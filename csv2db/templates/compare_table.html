@@ -26,8 +26,8 @@
     <thead class="table-light">
       <tr>
         <th>Час</th>
-        <th>Факт (Вт·ч/м²)</th>
-        <th>Прогноз</th>
+        <th>Факт ({{ unit_label(actual_unit) }})</th>
+        <th>Прогноз ({{ unit_label(forecast_unit) }})</th>
         <th>Ошибка</th>
         <th>Ошибка (%)</th>
       </tr>
@@ -47,8 +47,8 @@
         <td><strong>Итого за {{ date }}</strong></td>
         <td><strong>{{ total.actual }}</strong></td>
         <td><strong>{{ total.forecast }}</strong></td>
-        <td></td>
-        <td></td>
+        <td><strong>{{ total.abs_error }}</strong></td>
+        <td><strong>{{ total.percent_error }}%</strong></td>
       </tr>
     </tbody>
   </table>
@@ -96,8 +96,8 @@
   <table class="table table-striped align-middle">
     <thead class="table-light">
       <tr>
-        <th>Факт (Вт·ч/м²)</th>
-        <th>Прогноз</th>
+        <th>Факт ({{ unit_label(actual_unit) }})</th>
+        <th>Прогноз ({{ unit_label(forecast_unit) }})</th>
         <th>Ошибка</th>
         <th>Ошибка (%)</th>
       </tr>
