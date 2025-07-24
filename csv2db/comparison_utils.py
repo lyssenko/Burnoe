@@ -76,9 +76,8 @@ def process_excel_energy_file(file, db, errors):
         skipped_value = melted['value'].isna().sum()
         skipped_time = melted['measurement_time'].isna().sum()
         melted = melted.dropna(subset=["value", "measurement_time"])
-
-        match = re.search(r"T-\d{1,2}", file.filename.upper())
-        source_label = match.group(0) if match else "T-?"
+        match = re.search(r"T[\s\-]?(\d)", file.filename.upper())
+        source_label = f"T-{match.group(1)}" if match else "T-?"
 
         for _, row in melted.iterrows():
             try:
@@ -225,11 +224,14 @@ def handle_uploaded_file(file, db, errors):
             df = df.iloc[1:].reset_index(drop=True)
 
         sensor_cols = df.columns[2:]
-        sensor_map = {
-            col: get_sensor_id(db, col.replace(".irradiation_raw", "").strip(),
-                               *determine_sensor_type_and_unit(col))
-            for col in sensor_cols
-        }
+        sensor_map = {}
+        for col in sensor_cols:
+            name = re.sub(r"\.irradiation_(raw|temp_compensated)$", "", col.strip())
+            name = re.sub(r"^Pyranometer\.(horizontal|module)\.(\d+)", r"Pyranometer.module.\2", name)
+            sensor_type, unit = determine_sensor_type_and_unit(col)
+            sensor_id = get_sensor_id(db, name, sensor_type, unit)
+            sensor_map[col] = sensor_id
+
         inserted += process_measurements(df, sensor_cols, sensor_map, db, file.filename, errors)
 
     return inserted
