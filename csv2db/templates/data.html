@@ -37,7 +37,18 @@
     </div>
 </form>
 
-<h2 class="mb-3">Измерения</h2>
+{% if username %}
+<hr class="my-4">
+<h4>Удалить данные</h4>
+<form method="post" action="/delete_measurements" onsubmit="return confirm('Удалить выбранные данные?');">
+    <input type="hidden" name="sensor_id" value="{{ selected_sensor_id }}">
+    <input type="hidden" name="start_date" value="{{ start_date }}">
+    <input type="hidden" name="end_date" value="{{ end_date }}">
+    <button type="submit" class="btn btn-danger">Удалить данные за выбранный период</button>
+</form>
+{% endif %}
+
+<h4 class="mb-3">Измерения</h4>
 <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
     <table class="table table-striped align-middle">
         <thead class="table-light">
@@ -60,7 +71,6 @@
         </tbody>
     </table>
 </div>
-
 
 <canvas id="myChart" width="800" height="400"></canvas>
 <br>

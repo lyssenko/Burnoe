@@ -3,6 +3,7 @@ import pandas as pd
 import csv
 import io
 import os
+import logging
 from dotenv import load_dotenv
 from sqlite3 import IntegrityError
 from db_session import SessionLocal
@@ -32,7 +33,15 @@ secret = os.getenv("SECRET_KEY")
 if not secret:
     raise RuntimeError("SECRET_KEY не найден в переменных окружения!")
 app.secret_key = secret
-app.permanent_session_lifetime = timedelta(minutes=1)
+app.permanent_session_lifetime = timedelta(minutes=10)
+project_root = os.path.dirname(os.path.abspath(__file__))
+log_path = os.path.join(project_root, "deletion.log")
+logger = logging.getLogger("deletion_log")
+handler = logging.FileHandler(log_path, encoding="utf-8")
+formatter = logging.Formatter("%(asctime)s - %(message)s")
+handler.setFormatter(formatter)
+logger.setLevel(logging.INFO)
+logger.addHandler(handler)
 
 
 def login_required(f):
@@ -641,6 +650,46 @@ def admin_sensors():
 
         sensors = db.query(Sensor).order_by(Sensor.sensor_id).all()
     return render_template("admin_sensors.html", sensors=sensors)
+
+
+@app.route("/delete_measurements", methods=["POST"])
+def delete_measurements():
+    if "username" not in session:
+        flash("Необходима авторизация", "danger")
+        return redirect(url_for("login"))
+
+    username = session.get("username")
+    sensor_id = request.form.get("sensor_id")
+    start_date = request.form.get("start_date")
+    end_date = request.form.get("end_date")
+
+    if not sensor_id or not start_date:
+        flash("Неверные параметры удаления", "danger")
+        return redirect(url_for("show_data"))
+
+    try:
+        sensor_id = int(sensor_id)
+    except ValueError:
+        flash("Некорректный ID сенсора", "danger")
+        return redirect(url_for("show_data"))
+
+    start_dt, end_dt = parse_date_range(start_date, end_date)
+
+    with SessionLocal() as db:
+        query = db.query(Measurement).filter(Measurement.sensor_id == sensor_id)
+
+        if start_dt:
+            query = query.filter(Measurement.measurement_time >= start_dt)
+        if end_dt:
+            query = query.filter(Measurement.measurement_time <= end_dt)
+
+        deleted_rows = query.delete(synchronize_session=False)
+        db.commit()
+
+    logger.info(f"Пользователь '{username}' удалил {deleted_rows} записей (sensor_id={sensor_id}, от {start_date} до {end_date})")
+
+    flash(f"Удалено {deleted_rows} измерений.", "success")
+    return redirect(url_for("show_data", sensor_id=sensor_id, start_date=start_date, end_date=end_date))
 
 
 if __name__ == "__main__":
