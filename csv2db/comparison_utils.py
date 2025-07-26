@@ -48,6 +48,7 @@ def process_excel_energy_file(file, db, errors):
     skipped_value = 0
     skipped_sensor = 0
     inserted = 0
+    date = '2000-01-01'
     try:
         xl = pd.ExcelFile(file)
         df = xl.parse("Лист1")
@@ -78,6 +79,7 @@ def process_excel_energy_file(file, db, errors):
         melted = melted.dropna(subset=["value", "measurement_time"])
         match = re.search(r"T[\s\-]?(\d)", file.filename.upper())
         source_label = f"T-{match.group(1)}" if match else "T-?"
+        date = melted['measurement_time'][3].date().strftime('%Y-%m-%d')
 
         for _, row in melted.iterrows():
             try:
@@ -123,7 +125,7 @@ def process_excel_energy_file(file, db, errors):
         print(f"Суммарное значение: {total_value}")
     except Exception as e:
         errors.append(f"Не удалось обработать Excel: {e}")
-    return inserted
+    return inserted, date
 
 def get_sensor_names(db, actual_id: int, forecast_id: int):
     try:
@@ -211,12 +213,16 @@ def compare_sensors(db, actual_id, forecast_id, start_dt, end_dt):
 
 def handle_uploaded_file(file, db, errors):
     inserted = 0
+    date = '2000-01-01'
     filename = file.filename.lower()
 
     if filename.endswith('.xlsx'):
-        inserted += process_excel_energy_file(file, db, errors)
+        ins, date = process_excel_energy_file(file, db, errors)
+        inserted += ins
     else:
         df = pd.read_csv(file, sep=';')
+        date = datetime.strptime(df['Date'][3], '%d.%m.%Y').strftime('%Y-%m-%d')
+       
         if df.shape[1] < 3:
             errors.append(f"Файл {file.filename} содержит недостаточно столбцов.")
             return 0
@@ -234,7 +240,7 @@ def handle_uploaded_file(file, db, errors):
 
         inserted += process_measurements(df, sensor_cols, sensor_map, db, file.filename, errors)
 
-    return inserted
+    return inserted, date
 
 def parse_date_range(start_str, end_str):
     try:
@@ -294,7 +300,7 @@ def group_measurements(measurements, interval_minutes):
 
     return {dt: sum(vals) / len(vals) for dt, vals in grouped.items() if vals}
 
-def save_virtual_averages(db):
+def save_virtual_averages(db, start_time, end_time):
     for virtual_name, source_names in VIRTUAL_SENSOR_GROUPS.items():
         virtual_sensor = db.query(Sensor).filter_by(sensor_name=virtual_name).first()
         if not virtual_sensor:
@@ -308,7 +314,8 @@ def save_virtual_averages(db):
             continue
 
         rows = db.query(Measurement.measurement_time, Measurement.value, Measurement.sensor_id)\
-            .filter(Measurement.sensor_id.in_(sensor_ids))\
+            .filter(Measurement.sensor_id.in_(sensor_ids), 
+                    Measurement.measurement_time.between(start_time, end_time))\
             .all()
         if not rows:
             print(f"Нет данных для расчёта {virtual_name}")
@@ -339,5 +346,4 @@ def save_virtual_averages(db):
             )
             db.execute(stmt)
 
-    db.commit()
     print("Средние значения для виртуальных сенсоров успешно сохранены.")

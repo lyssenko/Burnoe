@@ -111,11 +111,13 @@ def upload():
 
     errors = []
     total_inserted = 0
+    date = '2000-01-01'
     with SessionLocal() as db:
         for file in files:
             if file and file.filename:
                 try:
-                    total_inserted += handle_uploaded_file(file, db, errors)
+                    inserted, date = handle_uploaded_file(file, db, errors)
+                    total_inserted += inserted
                 except Exception as e:
                     errors.append(f"Ошибка обработки {file.filename}: {e}")
 
@@ -128,13 +130,15 @@ def upload():
             if len(errors) > 10:
                 msg += f"\n... и ещё {len(errors) - 10} ошибок скрыто."
             return msg, 400
-
+    
         try:
-            save_virtual_averages(db)
+            start_dt, end_dt = parse_date_range(date, date)
+            save_virtual_averages(db, start_dt, end_dt)
         except Exception as e:
             db.rollback()
             return f"Ошибка при расчёте средних значений: {e}", 500
 
+        db.commit()
     return f"Данные успешно загружены. Всего записей: {total_inserted}."
 
 
