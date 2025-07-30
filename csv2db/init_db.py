@@ -60,10 +60,10 @@ if __name__ == "__main__":
         existing_user = db.query(User).filter_by(username="admin").first()
         if not existing_user:
             user = User(username="admin")
-            user.set_password("12345")
+            user.set_password("Burnoe-123")
             db.add(user)
             db.commit()
-            print("Создан пользователь admin с паролем 12345")
+            print("Создан пользователь admin с паролем Burnoe-123")
         else:
             print("Пользователь admin уже существует")
 
