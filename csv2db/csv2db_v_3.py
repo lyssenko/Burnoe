@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from sqlite3 import IntegrityError
 from db_session import SessionLocal
 from init_db import Sensor, Measurement, User
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from flask import Flask, request, render_template, redirect, url_for
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from flask import session, flash, make_response
@@ -16,6 +16,7 @@ from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from functools import wraps
 from sensor_labels import SENSOR_LABELS, UNIT_LABELS
+from collections import defaultdict
 from comparison_utils import (
     get_common_time_series,
     get_measurements,
@@ -24,6 +25,7 @@ from comparison_utils import (
     parse_date_range,
     group_measurements,
     save_virtual_averages,
+    get_avg_measurements_for_all
 )
 
 
@@ -268,8 +270,13 @@ def show_data():
             query = query.filter(Measurement.sensor_id == int(selected_sensor_id))
 
         start_dt, end_dt = parse_date_range(start_date, end_date)
-        query = query.filter(Measurement.measurement_time >= start_dt)
-        query = query.filter(Measurement.measurement_time <= end_dt)
+
+        if start_dt is not None:
+            query = query.filter(Measurement.measurement_time >= start_dt)
+
+        if end_dt is not None:
+            query = query.filter(Measurement.measurement_time <= end_dt)
+
         measurements = query.order_by(Measurement.measurement_time).all()
 
         grouped = group_measurements(measurements, interval)
@@ -292,9 +299,6 @@ def show_data():
 @app.route("/compare_select", methods=["GET"])
 def compare_select():
     data_type = request.args.get("data_type", "radiation")
-
-    from datetime import date, timedelta
-
     default_start = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
     default_end = date.today().strftime("%Y-%m-%d")
 
@@ -384,8 +388,6 @@ def compare():
 
 @app.route("/compare_table", methods=["GET"])
 def compare_table():
-    from collections import defaultdict
-
     with SessionLocal() as db:
         sensor_actual_id = request.args.get("sensor_actual_id")
         sensor_forecast_id = request.args.get("sensor_forecast_id")
@@ -420,15 +422,11 @@ def compare_table():
             if sensor_actual_id == -1
             else db.get(Sensor, sensor_actual_id).sensor_name
         )
-        
-        from comparison_utils import get_sensor_names
         actual_name, forecast_name, actual_unit, forecast_unit = get_sensor_names(
             db, sensor_actual_id, sensor_forecast_id
         )
 
         if sensor_actual_id == -1:
-            from comparison_utils import get_avg_measurements_for_all
-
             actual_data = get_avg_measurements_for_all(db, start_dt, end_dt)
         else:
             actual_data = (
@@ -517,7 +515,6 @@ def compare_table():
         }
 
     daily_totals = list(daily_totals_dict.values())
-
 
     total_actual_sum = sum(
         row["actual"]
@@ -646,10 +643,39 @@ def admin_sensors():
         if request.method == "POST":
             visible_ids = set(map(int, request.form.getlist("visible_sensor")))
             all_sensors = db.query(Sensor).all()
+            id_to_sensor = {s.sensor_id: s for s in all_sensors}
+
             for sensor in all_sensors:
                 sensor.visible = sensor.sensor_id in visible_ids
+
+                sid = sensor.sensor_id
+                new_name = request.form.get(f"sensor_name_{sid}", "").strip()
+                new_type = request.form.get(f"sensor_type_{sid}", "").strip()
+                new_unit = request.form.get(f"sensor_unit_{sid}", "").strip()
+                merge_target_id = request.form.get(f"merge_target_{sid}", "").strip()
+
+                if new_name and new_name != sensor.sensor_name:
+                    sensor.sensor_name = new_name
+                if new_type and new_type != sensor.sensor_type:
+                    sensor.sensor_type = new_type
+                if new_unit and new_unit != sensor.unit:
+                    sensor.unit = new_unit
+
+                if merge_target_id:
+                    try:
+                        target_id = int(merge_target_id)
+                        if target_id in id_to_sensor:
+                            db.query(Measurement).filter(Measurement.sensor_id == sid).update(
+                                {Measurement.sensor_id: target_id}
+                            )
+                            db.delete(sensor)
+                    except Exception as e:
+                        db.rollback()
+                        flash(f"Ошибка переноса сенсора ID {sid}: {e}", "danger")
+                        return redirect(url_for("admin_sensors"))
+
             db.commit()
-            flash("Настройки видимости сохранены.", "success")
+            flash("Изменения успешно сохранены.", "success")
             return redirect(url_for("admin_sensors"))
 
         sensors = db.query(Sensor).order_by(Sensor.sensor_id).all()

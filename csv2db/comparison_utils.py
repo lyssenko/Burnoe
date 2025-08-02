@@ -1,14 +1,12 @@
 import logging
 import pandas as pd
 import re
-import numpy as np
 from collections import defaultdict
 from datetime import datetime, timedelta
 from collections import namedtuple
 from init_db import Sensor, Measurement
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sensor_labels import VIRTUAL_SENSOR_GROUPS
-
 
 DataPoint = namedtuple("DataPoint", ["measurement_time", "value"])
 
@@ -52,7 +50,10 @@ def process_excel_energy_file(file, db, errors):
     try:
         xl = pd.ExcelFile(file)
         df = xl.parse("Лист1")
+        
+        original_columns = df.columns.tolist()
         df.columns = [col.strip().split("\n")[0] for col in df.columns]
+
         df = df.dropna(subset=[df.columns[1]])
         df = df[~df[df.columns[1]].isin(["Сумма", "Среднее"])]
 
@@ -77,9 +78,18 @@ def process_excel_energy_file(file, db, errors):
         skipped_value = melted['value'].isna().sum()
         skipped_time = melted['measurement_time'].isna().sum()
         melted = melted.dropna(subset=["value", "measurement_time"])
+
         match = re.search(r"T[\s\-]?(\d)", file.filename.upper())
         source_label = f"T-{match.group(1)}" if match else "T-?"
-        date = melted['measurement_time'][3].date().strftime('%Y-%m-%d')
+        date = melted['measurement_time'].iloc[0].date().strftime('%Y-%m-%d')
+
+        if any("Показания счетчика" in col for col in original_columns):
+            print("Обнаружены накопленные данные — преобразуем в приращения.")
+            melted.sort_values("measurement_time", inplace=True)
+            for sensor_name in melted["sensor_name"].unique():
+                mask = melted["sensor_name"] == sensor_name
+                melted.loc[mask, "value"] = melted.loc[mask, "value"].diff()
+            melted = melted.dropna(subset=["value"])
 
         for _, row in melted.iterrows():
             try:
@@ -113,11 +123,9 @@ def process_excel_energy_file(file, db, errors):
                         set_={"value": float(row["value"])}
                     )
                 )
-                print(f"Добавляется: {full_sensor_name}, {row['measurement_time']}, {row['value']}")
                 db.execute(stmt)
                 inserted += 1
             except Exception as e:
-                print(f"Ошибка строки: {e}")
                 errors.append(f"Ошибка в строке Excel: {e}")
 
         print(f"Всего вставлено: {inserted}, пропущено по времени: {skipped_time}, по значению: {skipped_value}, по sensor_id: {skipped_sensor}")
@@ -288,7 +296,6 @@ def get_avg_measurements_for_all(db, start_dt, end_dt):
     return avg_data
 
 def group_measurements(measurements, interval_minutes):
-    from collections import defaultdict
 
     grouped = defaultdict(list)
     for m in measurements:
@@ -321,7 +328,6 @@ def save_virtual_averages(db, start_time, end_time):
             print(f"Нет данных для расчёта {virtual_name}")
             continue
 
-        import pandas as pd
         df = pd.DataFrame(rows, columns=["time", "value", "sensor_id"])
         df = df.dropna()
         if df.empty:

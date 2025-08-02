@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Админка сенсоров{% endblock %}
+
 {% block content %}
-<h1 class="mb-4">Управление видимостью сенсоров</h1>
+<h1 class="mb-4">Управление сенсорами</h1>
+
 <form method="post">
   <div class="table-responsive">
     <table class="table table-striped align-middle">
@@ -12,24 +14,56 @@
           <th>Тип</th>
           <th>Единица</th>
           <th>Видим</th>
+          <th>Переместить в</th>
         </tr>
       </thead>
       <tbody>
         {% for sensor in sensors %}
         <tr>
           <td>{{ sensor.sensor_id }}</td>
-          <td>{{ sensor_label(sensor.sensor_name) }}</td>
-          <td>{{ sensor.sensor_type }}</td>
-          <td>{{ unit_label(sensor.unit) }}</td>
+
+          <td>
+            <input type="text" class="form-control" name="sensor_name_{{ sensor.sensor_id }}"
+              value="{{ sensor.sensor_name }}">
+          </td>
+
+          <td>
+            <select class="form-select" name="sensor_type_{{ sensor.sensor_id }}">
+              {% for t in ['radiation', 'temperature', 'wind', 'energy_active', 'energy_reactive', 'virtual', 'unknown'] %}
+              <option value="{{ t }}" {% if sensor.sensor_type == t %}selected{% endif %}>{{ t }}</option>
+              {% endfor %}
+            </select>
+          </td>
+
+          <td>
+            <select class="form-select" name="sensor_unit_{{ sensor.sensor_id }}">
+              {% for u in ['W/m2', '℃', 'm/s', 'kWh', 'kvarh', 'unknown'] %}
+              <option value="{{ u }}" {% if sensor.unit == u %}selected{% endif %}>{{ u }}</option>
+              {% endfor %}
+            </select>
+          </td>
+
           <td>
             <input type="checkbox" name="visible_sensor" value="{{ sensor.sensor_id }}"
               {% if sensor.visible %}checked{% endif %}>
+          </td>
+
+          <td>
+            <select class="form-select" name="merge_target_{{ sensor.sensor_id }}">
+              <option value="">—</option>
+              {% for target in sensors if target.sensor_id != sensor.sensor_id %}
+              <option value="{{ target.sensor_id }}">
+                {{ target.sensor_name }} (ID {{ target.sensor_id }})
+              </option>
+              {% endfor %}
+            </select>
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+
   <div class="d-flex gap-2 mt-3">
     <button type="submit" class="btn btn-success">Сохранить</button>
     <a href="/" class="btn btn-outline-secondary">← На главную</a>
