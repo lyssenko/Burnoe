@@ -56,9 +56,13 @@ def process_excel_energy_file(file, db, errors):
 
         df = df.dropna(subset=[df.columns[1]])
         df = df[~df[df.columns[1]].isin(["Сумма", "Среднее"])]
+        dt1 = pd.to_datetime(df[df.columns[1]].astype(str), dayfirst=True, errors="coerce")
+        dt2 = pd.to_datetime(df[df.columns[1]].astype(str), format='%d.%m.%Y %H:%M', dayfirst=True, errors="coerce")
+        dt_final = dt1.combine_first(dt2)
+        df[df.columns[1]] = dt_final
 
-        df[df.columns[1]] = pd.to_datetime(df[df.columns[1]], dayfirst=True, errors='coerce')
         df = df.dropna(subset=[df.columns[1]])
+
         df[df.columns[1]] = df[df.columns[1]].dt.floor("min")
 
         def correct_time(dt):
