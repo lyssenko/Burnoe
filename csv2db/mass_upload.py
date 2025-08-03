@@ -23,10 +23,14 @@ if "Вход" in login_resp.text or "Неверный логин" in login_resp.
     exit(1)
 print("Успешный вход!")
 
+
 def upload_file(file_bytes, file_name, url, field):
     files_data = {field: (file_name, file_bytes)}
     response = session.post(url, files=files_data)
-    print(f"[{field.upper()}] {file_name}: {response.status_code} — {response.text[:100]}")
+    print(
+        f"[{field.upper()}] {file_name}: {response.status_code} — {response.text[:100]}"
+    )
+
 
 def process_folder(folder, url, field):
     for root, dirs, files in os.walk(folder):
@@ -38,7 +42,7 @@ def process_folder(folder, url, field):
             elif file.lower().endswith(".zip"):
                 print(f"Обнаружен архив: {file_path}")
                 try:
-                    with zipfile.ZipFile(file_path, 'r') as z:
+                    with zipfile.ZipFile(file_path, "r") as z:
                         for inner_name in z.namelist():
                             if inner_name.lower().endswith((".csv", ".xlsx")):
                                 with z.open(inner_name) as zipped_file:
@@ -48,6 +52,6 @@ def process_folder(folder, url, field):
                     print(f"Ошибка при обработке {file_path}: {e}")
 
 
-process_folder(FOLDER, UPLOAD_URL, 'dataFile')
+process_folder(FOLDER, UPLOAD_URL, "dataFile")
 
-process_folder(FORECAST_FOLDER, UPLOAD_FORECAST_URL, 'forecastFile')
+process_folder(FORECAST_FOLDER, UPLOAD_FORECAST_URL, "forecastFile")

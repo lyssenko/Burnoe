@@ -25,7 +25,7 @@ from comparison_utils import (
     parse_date_range,
     group_measurements,
     save_virtual_averages,
-    get_avg_measurements_for_all
+    get_avg_measurements_for_all,
 )
 
 
@@ -57,6 +57,7 @@ def login_required(f):
                 flash("Необходимо войти в систему", "warning")
             return redirect(url_for("login"))
         return f(*args, **kwargs)
+
     return decorated_function
 
 
@@ -113,7 +114,7 @@ def upload():
 
     errors = []
     total_inserted = 0
-    date = '2000-01-01'
+    date = "2000-01-01"
     with SessionLocal() as db:
         for file in files:
             if file and file.filename:
@@ -132,7 +133,7 @@ def upload():
             if len(errors) > 10:
                 msg += f"\n... и ещё {len(errors) - 10} ошибок скрыто."
             return msg, 400
-    
+
         try:
             start_dt, end_dt = parse_date_range(date, date)
             save_virtual_averages(db, start_dt, end_dt)
@@ -312,7 +313,7 @@ def compare_select():
             .filter(
                 ~Sensor.sensor_name.ilike("%forecast%"),
                 Sensor.visible == True,
-                Sensor.sensor_type.in_(actual_type_filter)
+                Sensor.sensor_type.in_(actual_type_filter),
             )
             .order_by(Sensor.sensor_name)
             .all()
@@ -323,7 +324,7 @@ def compare_select():
             .filter(
                 Sensor.sensor_name.ilike("%forecast%"),
                 Sensor.visible == True,
-                Sensor.sensor_type == data_type
+                Sensor.sensor_type == data_type,
             )
             .order_by(Sensor.sensor_name)
             .all()
@@ -356,7 +357,9 @@ def compare():
                 else start_dt + timedelta(days=1)
             )
 
-            actual_name, forecast_name, actual_unit, forecast_unit = get_sensor_names(db, actual_id, forecast_id)
+            actual_name, forecast_name, actual_unit, forecast_unit = get_sensor_names(
+                db, actual_id, forecast_id
+            )
 
             actual_data = get_measurements(db, actual_id, start_dt, end_dt)
             forecast_data = get_measurements(db, forecast_id, start_dt, end_dt)
@@ -511,7 +514,7 @@ def compare_table():
             "actual": round(actual_sum, 3),
             "forecast": round(forecast_sum, 3),
             "abs_error": round(abs_error, 3),
-            "percent_error": round(percent_error, 2)
+            "percent_error": round(percent_error, 2),
         }
 
     daily_totals = list(daily_totals_dict.values())
@@ -666,9 +669,9 @@ def admin_sensors():
                     try:
                         target_id = int(merge_target_id)
                         if target_id in id_to_sensor:
-                            db.query(Measurement).filter(Measurement.sensor_id == sid).update(
-                                {Measurement.sensor_id: target_id}
-                            )
+                            db.query(Measurement).filter(
+                                Measurement.sensor_id == sid
+                            ).update({Measurement.sensor_id: target_id})
                             db.delete(sensor)
                     except Exception as e:
                         db.rollback()
@@ -677,9 +680,14 @@ def admin_sensors():
 
             for sid in delete_ids:
                 if sid in id_to_sensor:
-                    measurement_count = db.query(Measurement).filter_by(sensor_id=sid).count()
+                    measurement_count = (
+                        db.query(Measurement).filter_by(sensor_id=sid).count()
+                    )
                     if measurement_count > 0:
-                        flash(f"Сенсор ID {sid} не был удалён: по нему есть данные ({measurement_count} измерений)", "danger")
+                        flash(
+                            f"Сенсор ID {sid} не был удалён: по нему есть данные ({measurement_count} измерений)",
+                            "danger",
+                        )
                     else:
                         db.delete(id_to_sensor[sid])
 
@@ -725,10 +733,16 @@ def delete_measurements():
         deleted_rows = query.delete(synchronize_session=False)
         db.commit()
 
-    logger.info(f"Пользователь '{username}' удалил {deleted_rows} записей (sensor_id={sensor_id}, от {start_date} до {end_date})")
+    logger.info(
+        f"Пользователь '{username}' удалил {deleted_rows} записей (sensor_id={sensor_id}, от {start_date} до {end_date})"
+    )
 
     flash(f"Удалено {deleted_rows} измерений.", "success")
-    return redirect(url_for("show_data", sensor_id=sensor_id, start_date=start_date, end_date=end_date))
+    return redirect(
+        url_for(
+            "show_data", sensor_id=sensor_id, start_date=start_date, end_date=end_date
+        )
+    )
 
 
 if __name__ == "__main__":
