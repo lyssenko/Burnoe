@@ -6,11 +6,73 @@ from datetime import datetime, timedelta
 from collections import namedtuple
 from init_db import Sensor, Measurement
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sensor_labels import VIRTUAL_SENSOR_GROUPS
+from sensor_labels import VIRTUAL_SENSOR_GROUPS, MONTH_DIGIT
 
 DataPoint = namedtuple("DataPoint", ["measurement_time", "value"])
 
 logger = logging.getLogger(__name__)
+
+def excel_date_to_datetime(x):
+    return datetime(1899, 12, 30) + timedelta(days=x)
+
+def date_to_wind_speed(dt):
+    if not isinstance(dt, datetime):
+        return None
+    return float(f"{dt.day}.{dt.month}")
+
+def try_parse_excel_date(val):
+
+    try:
+        x = float(val)
+        if x > 40000 and x < 90000:
+            dt = datetime(1899, 12, 30) + timedelta(days=x)
+            return float(f"{dt.day}.{dt.month}")
+    except Exception:
+        pass
+    return None
+
+def parse_messy_excel_number(val):
+    if pd.isna(val):
+        return None
+    s = str(val).strip().lower()
+    
+    date_speed = try_parse_excel_date(s)
+    if date_speed is not None:
+        return date_speed
+    
+    match = re.match(r'(\d+)[\.,]?\s*([а-яё]+)', s)
+    if match:
+        int_part = match.group(1)
+        month_part = match.group(2)
+        frac = MONTH_DIGIT.get(month_part[:4], None)
+        if frac is not None:
+            return float(f"{int_part}.{frac}")
+    
+    s = s.replace(',', '.')
+    try:
+        return float(s)
+    except:
+        return None
+
+def parse_value_by_type(col, val):
+    col_l = col.lower()
+    if any(word in col_l for word in ['wind', 'ветр', 'temp', 'температ']):
+        value = parse_messy_excel_number(val)
+    else:
+        try:
+            value = float(str(val).replace(',', '.'))
+        except Exception:
+            return None
+
+    if value is not None:
+        if any(word in col_l for word in ['wind', 'ветр']):
+            if value < 0 or value > 80:
+                return None
+        if any(word in col_l for word in ['temp', 'температ']):
+            if value < -60 or value > 70:
+                return None
+
+    return value
 
 def process_measurements(df, sensor_cols, sensor_map, db, filename, errors):
     inserted = 0
@@ -25,7 +87,10 @@ def process_measurements(df, sensor_cols, sensor_map, db, filename, errors):
 
         for col in sensor_cols:
             try:
-                value = float(row[col])
+                value = parse_value_by_type(col, row[col])
+                if value is None:
+                    continue
+
                 sensor_id = sensor_map[col]
                 stmt = (
                     sqlite_insert(Measurement)
