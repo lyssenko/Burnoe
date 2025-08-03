@@ -642,6 +642,7 @@ def admin_sensors():
     with SessionLocal() as db:
         if request.method == "POST":
             visible_ids = set(map(int, request.form.getlist("visible_sensor")))
+            delete_ids = set(map(int, request.form.getlist("delete_sensor")))
             all_sensors = db.query(Sensor).all()
             id_to_sensor = {s.sensor_id: s for s in all_sensors}
 
@@ -674,12 +675,20 @@ def admin_sensors():
                         flash(f"Ошибка переноса сенсора ID {sid}: {e}", "danger")
                         return redirect(url_for("admin_sensors"))
 
+            for sid in delete_ids:
+                if sid in id_to_sensor:
+                    measurement_count = db.query(Measurement).filter_by(sensor_id=sid).count()
+                    if measurement_count > 0:
+                        flash(f"Сенсор ID {sid} не был удалён: по нему есть данные ({measurement_count} измерений)", "danger")
+                    else:
+                        db.delete(id_to_sensor[sid])
+
             db.commit()
             flash("Изменения успешно сохранены.", "success")
             return redirect(url_for("admin_sensors"))
 
         sensors = db.query(Sensor).order_by(Sensor.sensor_id).all()
-    return render_template("admin_sensors.html", sensors=sensors)
+        return render_template("admin_sensors.html", sensors=sensors)
 
 
 @app.route("/delete_measurements", methods=["POST"])

@@ -15,18 +15,17 @@
           <th>Единица</th>
           <th>Видим</th>
           <th>Переместить в</th>
+          <th>Удалить</th>
         </tr>
       </thead>
       <tbody>
         {% for sensor in sensors %}
         <tr>
           <td>{{ sensor.sensor_id }}</td>
-
           <td>
             <input type="text" class="form-control" name="sensor_name_{{ sensor.sensor_id }}"
               value="{{ sensor.sensor_name }}">
           </td>
-
           <td>
             <select class="form-select" name="sensor_type_{{ sensor.sensor_id }}">
               {% for t in ['radiation', 'temperature', 'wind', 'energy_active', 'energy_reactive', 'virtual', 'unknown'] %}
@@ -34,7 +33,6 @@
               {% endfor %}
             </select>
           </td>
-
           <td>
             <select class="form-select" name="sensor_unit_{{ sensor.sensor_id }}">
               {% for u in ['W/m2', '℃', 'm/s', 'kWh', 'kvarh', 'unknown'] %}
@@ -42,12 +40,10 @@
               {% endfor %}
             </select>
           </td>
-
           <td>
             <input type="checkbox" name="visible_sensor" value="{{ sensor.sensor_id }}"
               {% if sensor.visible %}checked{% endif %}>
           </td>
-
           <td>
             <select class="form-select" name="merge_target_{{ sensor.sensor_id }}">
               <option value="">—</option>
@@ -57,6 +53,9 @@
               </option>
               {% endfor %}
             </select>
+          </td>
+          <td>
+            <input type="checkbox" name="delete_sensor" value="{{ sensor.sensor_id }}">
           </td>
         </tr>
         {% endfor %}
