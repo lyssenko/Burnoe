@@ -8,6 +8,7 @@ __pycache__/
 csv2db/clear.py
 csv2db_v_3.zip
 key_gen.py
+find_and_clean.py
 
 # Virtual environment
 venv/
