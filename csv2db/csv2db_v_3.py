@@ -305,6 +305,42 @@ def show_data():
     )
 
 
+@app.route("/get_data", methods=["GET"])
+def get_data():
+    selected_sensor_id = request.args.get("sensor_id")
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+    interval = int(request.args.get("interval", 15))
+
+    with SessionLocal() as db:
+        sensors = db.query(Sensor).filter_by(visible=True).all()
+        query = db.query(Measurement)
+        if selected_sensor_id and selected_sensor_id.isdigit():
+            query = query.filter(Measurement.sensor_id == int(selected_sensor_id))
+
+        start_dt, end_dt = parse_date_range(start_date, end_date)
+
+        if start_dt is not None:
+            query = query.filter(Measurement.measurement_time >= start_dt)
+
+        if end_dt is not None:
+            query = query.filter(Measurement.measurement_time <= end_dt)
+
+        measurements = query.order_by(Measurement.measurement_time).all()
+
+        grouped = group_measurements(measurements, interval)
+        time_values = [dt.strftime("%Y-%m-%d %H:%M:%S") for dt in sorted(grouped)]
+        values = [grouped[dt] for dt in sorted(grouped)]
+
+    return {
+        'start_date': start_date,
+        'end_date': end_date,
+        'time': time_values,
+        'values': values,
+        'interval' : interval
+    }
+
+
 @app.route("/compare_select", methods=["GET"])
 def compare_select():
     data_type = request.args.get("data_type", "radiation")
