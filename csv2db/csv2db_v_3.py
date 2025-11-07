@@ -135,10 +135,15 @@ def upload():
             if len(errors) > 10:
                 msg += f"\n... и ещё {len(errors) - 10} ошибок скрыто."
             return msg, 400
+        if not dates:
+            db.commit()
+            return f"Данные успешно загружены. Всего записей: {total_inserted}."
         try:
-            for d in sorted(dates):
-                start_dt, end_dt = parse_date_range(d, d)
-                save_virtual_averages(db, start_dt, end_dt)
+            min_date = min(dates)
+            max_date = max(dates)
+            start_dt, _  = parse_date_range(min_date, min_date)
+            _, end_dt    = parse_date_range(max_date, max_date)
+            save_virtual_averages(db, start_dt, end_dt)
         except Exception as e:
             db.rollback()
             return f"Ошибка при расчёте средних значений: {e}", 500
